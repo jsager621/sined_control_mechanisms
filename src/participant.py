@@ -8,7 +8,7 @@ from ortools.linear_solver import pywraplp
 # Pyomo released under 3-clause BSD license
 
 GRANULARITY = 0.25
-DAY_STEPS = range(int(24 / GRANULARITY))
+DAY_STEPS = range(int(6 / GRANULARITY))
 DAY_STEPS_PLUS_1 = range(int(24 / GRANULARITY + 1))
 ELEC_PRICE = 0.35
 FEEDIN_TARIFF = 0.07
@@ -42,7 +42,6 @@ class NetParticipant:  # Agent):
 
 
 def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_vals):
-    model = pyo.ConcreteModel()
     solver = pywraplp.Solver.CreateSolver("SAT")  # mip solver with SCIP backend
     inf = solver.infinity()
 
@@ -52,38 +51,42 @@ def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_v
     x_bss_p_charge = {}
     x_bss_p_discharge = {}
     x_bss_e = {}
-    for step in DAY_STEPS:
-        x_grid_load[step] = solver.NumVar(0, inf, "grid_load[%i]" % step)
-        x_grid_feedin[step] = solver.NumVar(0, inf, "x_grid_feedin[%i]" % step)
-        x_bss_p_charge[step] = solver.NumVar(0, inf, "x_bss_p_charge[%i]" % step)
-        x_bss_p_discharge[step] = solver.NumVar(0, inf, "x_bss_p_discharge[%i]" % step)
-        x_bss_e[step] = solver.NumVar(0, bss_vals["e_max"], "x_bss_e[%i]" % step)
-    x_bss_e[step + 1] = solver.NumVar(0, bss_vals["e_max"], "x_bss_e[%i]" % step)
+    for t in DAY_STEPS:
+        x_grid_load[t] = solver.NumVar(0, inf, "x_grid_load[%i]" % t)
+        x_grid_feedin[t] = solver.NumVar(0, inf, "x_grid_feedin[%i]" % t)
+        x_bss_p_charge[t] = solver.NumVar(
+            0, bss_vals["p_max"], "x_bss_p_charge[%i]" % t
+        )
+        x_bss_p_discharge[t] = solver.NumVar(
+            0, bss_vals["p_max"], "x_bss_p_discharge[%i]" % t
+        )
+        x_bss_e[t] = solver.NumVar(0, bss_vals["e_max"], "x_bss_e[%i]" % t)
+    x_bss_e[t + 1] = solver.NumVar(0, bss_vals["e_max"], "x_bss_e[%i]" % t)
     print("Number of variables =", solver.NumVariables())
 
     # add objective function
     """obj_expr = [
-        ELEC_PRICE * x_grid_load[step] - FEEDIN_TARIFF * x_grid_feedin[step]
-        for step in DAY_STEPS
+        ELEC_PRICE * x_grid_load[t] - FEEDIN_TARIFF * x_grid_feedin[t]
+        for t in DAY_STEPS
     ]
     solver.Minimize(solver.Sum(obj_expr))"""
     obj = solver.Objective()
-    for step in DAY_STEPS:
-        obj.SetCoefficient(x_grid_load[step], ELEC_PRICE)
-        obj.SetCoefficient(x_grid_feedin[step], FEEDIN_TARIFF)
+    for t in DAY_STEPS:
+        obj.SetCoefficient(x_grid_load[t], ELEC_PRICE / GRANULARITY / 1000)
+        obj.SetCoefficient(x_grid_feedin[t], -FEEDIN_TARIFF / GRANULARITY / 1000)
         obj.SetMinimization()
 
     # add constraints: balance
-    model.C_bal = pyo.ConstraintList()
     for t in DAY_STEPS:
-        model.C_bal.add(
-            expr=load_profile[t]
+        load_expr = [
+            load_profile[t]
             + hp_profile[t]
             + ev_profile[t]
-            + model.x_grid_feedin[t]
-            + model.x_bss_p_charge[t]
-            == generation_profile[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
-        )
+            + x_grid_feedin[t]
+            + x_bss_p_charge[t]
+        ]
+        gen_expr = [generation_profile[t] + x_grid_load[t] + x_bss_p_discharge[t]]
+        solver.Add(sum(load_expr) - sum(gen_expr) == 0)
 
     # add constraints: ev
 
@@ -91,35 +94,33 @@ def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_v
 
     # add constraints: bss starting energy level
     solver.Add(x_bss_p_charge[0] == bss_vals["end"])
-    model.C_bss_start = pyo.Constraint(expr=model.x_bss_p_charge[0] == bss_vals["end"])
     # add constraints: bss time coupling
-    model.C_bss_time_coupl = pyo.ConstraintList()
     for t in DAY_STEPS:
-        model.C_bss_time_coupl.add(
-            expr=model.x_bss_e[t + 1]
-            == model.x_bss_e[t]
-            + (
-                model.x_bss_p_charge[t] * bss_vals["eff"]
-                - model.x_bss_p_discharge[t] / bss_vals["eff"]
-            )
-            * GRANULARITY,
-        )
-    # add constraints: bss limit maximum power
-    model.C_bss_pcha_lim = pyo.Constraint(
-        expr=model.x_bss_p_charge <= bss_vals["p_max"]
-    )
-    model.C_bss_pdischa_lim = pyo.Constraint(
-        expr=model.x_bss_p_discharge <= bss_vals["p_max"]
-    )
-
-    opt = SolverFactory("ipopt")
-    opt.set_options("max_iter=2")
-    solver_manager = SolverManagerFactory("serial")
-    results = solver_manager.solve(model, opt=opt, tee=True, timelimit=None)
-    model.load(results)
+        adapt_e_expr = (
+            x_bss_p_charge[t] * bss_vals["eff"] - x_bss_p_discharge[t] / bss_vals["eff"]
+        ) * GRANULARITY
+        solver.Add(x_bss_e[t + 1] == x_bss_e[t] + adapt_e_expr)
 
     print(f"Solving with {solver.SolverVersion()}")
     status = solver.Solve()
+    if status == pywraplp.Solver.OPTIMAL:
+        print("Objective value =", solver.Objective().Value())
+        for t in DAY_STEPS:
+            print(x_grid_load[t].name(), " = ", x_grid_load[t].solution_value())
+            print(x_grid_feedin[t].name(), " = ", x_grid_feedin[t].solution_value())
+            print(x_bss_p_charge[t].name(), " = ", x_bss_p_charge[t].solution_value())
+            print(
+                x_bss_p_discharge[t].name(),
+                " = ",
+                x_bss_p_discharge[t].solution_value(),
+            )
+            print(x_bss_e[t + 1].name(), " = ", x_bss_e[t + 1].solution_value())
+        print()
+        print(f"Problem solved in {solver.wall_time():d} milliseconds")
+        print(f"Problem solved in {solver.iterations():d} iterations")
+        print(f"Problem solved in {solver.nodes():d} branch-and-bound nodes")
+    else:
+        print("The problem does not have an optimal solution.")
 
 
 # Test methods for Participant Class (shift later!)
