@@ -1,12 +1,11 @@
 # from mango import Agent
 import pyomo.environ as pyo
 import numpy as np
-from pyomo.contrib import appsi
 
 # Pyomo released under 3-clause BSD license
 
 GRANULARITY = 0.25
-DAY_STEPS = range(int(6 / GRANULARITY))
+DAY_STEPS = range(int(24 / GRANULARITY))
 DAY_STEPS_PLUS_1 = range(int(24 / GRANULARITY + 1))
 ELEC_PRICE = 0.35
 FEEDIN_TARIFF = 0.07
@@ -39,7 +38,31 @@ class NetParticipant:  # Agent):
         pass
 
 
-def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_vals):
+def calc_opt_day(
+    baseload: list,
+    pv_gen: list,
+    ev_cha: list,
+    hp_el_dem: list,
+    bss_vals: dict,
+    elec_price=ELEC_PRICE,
+    feedin_tariff=FEEDIN_TARIFF,
+) -> dict:
+    """Calculate the optimal schedule for the household based on profiles and parameters.
+
+    Args:
+        baseload (list): baseload power demand profile
+        pv_gen (list): pv power generation profile
+        ev_cha (list): ev charging power profile
+        hp_el_dem (list): heatpump power demand profiles
+        bss_vals (dict): Info about bss - max power and energy plus energy level
+        elec_price (list, float): Single value or list of values for grid electricity price.
+            Defaults to ELEC_PRICE.
+        feedin_tariff (list, float): Single value or list of values for grid feedin price.
+            Defaults to FEEDIN_TARIFF.
+
+    Returns:
+        dict: schedules for the devices of the houeshold
+    """
     model = pyo.ConcreteModel()
 
     # add optimization variables
@@ -56,11 +79,15 @@ def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_v
     )
 
     # add objective function
+    if isinstance(elec_price, float):
+        elec_price = [elec_price for _ in DAY_STEPS]
+    if isinstance(feedin_tariff, float):
+        feedin_tariff = [feedin_tariff for _ in DAY_STEPS]
     model.OBJ = pyo.Objective(
         expr=sum(
             [
-                ELEC_PRICE * model.x_grid_load[t] / 1000 / GRANULARITY
-                - FEEDIN_TARIFF * model.x_grid_feedin[t] / 1000 / GRANULARITY
+                elec_price[t] * model.x_grid_load[t] / 1000 / GRANULARITY
+                - feedin_tariff[t] * model.x_grid_feedin[t] / 1000 / GRANULARITY
                 for t in DAY_STEPS
             ]
         )
@@ -70,12 +97,12 @@ def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_v
     model.C_bal = pyo.ConstraintList()
     for t in DAY_STEPS:
         model.C_bal.add(
-            expr=load_profile[t]
-            + hp_profile[t]
-            + ev_profile[t]
+            expr=baseload[t]
+            + hp_el_dem[t]
+            + ev_cha[t]
             + model.x_grid_feedin[t]
             + model.x_bss_p_charge[t]
-            == generation_profile[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
+            == pv_gen[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
         )
 
     # add constraints: ev
@@ -94,35 +121,39 @@ def calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_v
         model.C_bss_coupl.add(expr=model.x_bss_e[t + 1] == model.x_bss_e[t] + e_adapt)
 
     try:  # try solving it with gurobi, otherwise use opensource solver HiGHS
-        opt = appsi.solvers.Gurobi()
         opt = pyo.SolverFactory("gurobi")
         log = opt.solve(model)
     except:
         opt = pyo.SolverFactory("appsi_highs")
         log = opt.solve(model)
 
-    opt = pyo.SolverFactory("appsi_highs")  # try also 'cbc', 'glpk', 'gurobi'
-    # log = opt.solve(model, tee=True)
-    # log.write()
-    # assert log.solver.status == pyo.SolverStatus.ok
-    print("Objective value =", model.OBJ())
-    print("grid_load: ", np.round(model.x_grid_load[:](), 1))
-    print("grid_feedin: ", np.round(model.x_grid_feedin[:](), 1))
-    print("bss_p_charge: ", np.round(model.x_bss_p_charge[:](), 1))
-    print("bss_p_discharge: ", np.round(model.x_bss_p_discharge[:](), 1))
-    print("bss_e: ", np.round(model.x_bss_e[:](), 1))
+    profiles = {}
+    profiles["Baseload"] = baseload
+    profiles["PV"] = -pv_gen
+    profiles["EV"] = ev_cha
+    profiles["HP"] = hp_el_dem
+    profiles["BSS"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
+        model.x_bss_p_discharge[:](), 1
+    )
+
+    return profiles
 
 
 # Test methods for Participant Class (shift later!)
 if __name__ == "__main__":
-    load_profile = 500 * np.ones(96)
-    generation_profile = np.zeros(96)
-    ev_profile = np.zeros(96)
-    ev_profile[70:75] = 11000
-    hp_profile = np.zeros(96)
-    hp_profile[10:20] = 2000
-    hp_profile[40:45] = 2000
-    hp_profile[80:90] = 2000
+    baseload = 500 * np.ones(96)
+    pv_gen = np.zeros(96)
+    pv_gen[30:65] += 1000
+    pv_gen[36:59] += 1000
+    pv_gen[41:54] += 1200
+    pv_gen[44:51] += 1000
+    pv_gen[47:48] += 800
+    ev_cha = np.zeros(96)
+    ev_cha[70:75] = 11000
+    hp_el_dem = np.zeros(96)
+    hp_el_dem[10:20] = 2000
+    hp_el_dem[40:45] = 2000
+    hp_el_dem[80:90] = 2000
     bss_vals = {"end": 3000, "e_max": 5000, "p_max": 5000, "eff": 0.97}
 
-    calc_opt_day(load_profile, generation_profile, ev_profile, hp_profile, bss_vals)
+    profiles = calc_opt_day(baseload, pv_gen, ev_cha, hp_el_dem, bss_vals)
