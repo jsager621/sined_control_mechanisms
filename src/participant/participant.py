@@ -1,4 +1,4 @@
-# from mango import Agent
+from mango.agent.core import Agent
 import pyomo.environ as pyo
 import numpy as np
 
@@ -11,7 +11,7 @@ ELEC_PRICE = 0.35
 FEEDIN_TARIFF = 0.07
 
 
-class NetParticipant:  # Agent):
+class NetParticipant(Agent):
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
@@ -137,23 +137,3 @@ def calc_opt_day(
     )
 
     return profiles
-
-
-# Test methods for Participant Class (shift later!)
-if __name__ == "__main__":
-    baseload = 500 * np.ones(96)
-    pv_gen = np.zeros(96)
-    pv_gen[30:65] += 1000
-    pv_gen[36:59] += 1000
-    pv_gen[41:54] += 1200
-    pv_gen[44:51] += 1000
-    pv_gen[47:48] += 800
-    ev_cha = np.zeros(96)
-    ev_cha[70:75] = 11000
-    hp_el_dem = np.zeros(96)
-    hp_el_dem[10:20] = 2000
-    hp_el_dem[40:45] = 2000
-    hp_el_dem[80:90] = 2000
-    bss_vals = {"end": 3000, "e_max": 5000, "p_max": 5000, "eff": 0.97}
-
-    profiles = calc_opt_day(baseload, pv_gen, ev_cha, hp_el_dem, bss_vals)
