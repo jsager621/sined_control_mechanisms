@@ -100,15 +100,23 @@ def calc_opt_day(
         elec_price = [elec_price for _ in DAY_STEPS]
     if isinstance(feedin_tariff, float):
         feedin_tariff = [feedin_tariff for _ in DAY_STEPS]
+    ev_penalty = 10 * model.x_ev_pen[0]  # penalize non-filled ev battery
+    bss_incent = (
+        -(feedin_tariff[-1] + elec_price[-1])
+        / 2
+        * model.x_bss_e[DAY_STEPS_PLUS_1[-1]]
+        / 1000
+    )  # incentive bss energy at the end to not randomly feed into grid but store for next day
     model.OBJ = pyo.Objective(
         expr=sum(
             [
-                elec_price[t] * model.x_grid_load[t] / 1000 / GRANULARITY
-                - feedin_tariff[t] * model.x_grid_feedin[t] / 1000 / GRANULARITY
+                elec_price[t] * model.x_grid_load[t] / 1000 * GRANULARITY
+                - feedin_tariff[t] * model.x_grid_feedin[t] / 1000 * GRANULARITY
                 for t in DAY_STEPS
             ]
         )
-        + 10 * model.x_ev_pen[0]
+        + ev_penalty
+        + bss_incent
     )
 
     # add constraints: balance
@@ -178,6 +186,7 @@ def calc_opt_day(
     profiles["BSS"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
         model.x_bss_p_discharge[:](), 1
     )
+    profiles["BSS_e"] = np.round(model.x_bss_e[:](), 1)
     profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
         model.x_grid_feedin[:](), 1
     )
