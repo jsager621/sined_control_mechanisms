@@ -1,0 +1,18 @@
+{
+    "HOUSEHOLD": {
+        "load_kWh": 5000,
+        "heat_kWh": 20000,
+        "pv": {"power_kWp": 10},
+        "bss": {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95},
+        "ev": {"capacity_kWh": 45},
+        "charging_station": {"power_kW": 11, "efficiency": 0.95},
+        "heatpump": {"power_kW_th": 10, "power_kW_el": 3}
+    },
+    "PATHS": {
+        "load": "household_load.csv",
+        "pv": "pv_10kw.csv",
+        "charging_station": "charging_station_11kW.csv",
+        "ev": "ev_45kWh.csv",
+        "heatpump": "heatpump.csv"
+    }
+}
