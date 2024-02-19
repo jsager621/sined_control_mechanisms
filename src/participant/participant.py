@@ -101,6 +101,7 @@ def calc_opt_day(
     if isinstance(feedin_tariff, float):
         feedin_tariff = [feedin_tariff for _ in DAY_STEPS]
     ev_penalty = 10 * model.x_ev_pen[0]  # penalize non-filled ev battery
+    ev_dir_cha = sum((t / 1e6 * model.x_cs_p_charge[t]) for t in range(len(DAY_STEPS)))
     bss_incent = (
         -(feedin_tariff[-1] + elec_price[-1])
         / 2
@@ -117,6 +118,7 @@ def calc_opt_day(
         )
         + ev_penalty
         + bss_incent
+        + ev_dir_cha
     )
 
     # add constraints: balance
