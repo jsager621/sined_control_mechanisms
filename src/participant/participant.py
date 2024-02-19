@@ -42,6 +42,7 @@ class NetParticipant(Agent):
 
 def calc_opt_day(
     forecasts: dict,
+    pv_vals: dict,
     bss_vals: dict,
     cs_vals: dict,
     ev_vals: dict,
@@ -52,6 +53,7 @@ def calc_opt_day(
 
     Args:
         forecasts (dict): forecasts for devices profiles (baseload, pv, ev, hp)
+        pv_vals (dict): Info about pv system - max power
         bss_vals (dict): Info about battery storage system - efficiency, max power and energy plus energy level
         cs_vals (dict): Info about charging station - efficiency and max power
         ev_vals (dict): Info about electric vehicle - max energy plus energy level
@@ -68,6 +70,9 @@ def calc_opt_day(
     # add optimization variables
     model.x_grid_load = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
     model.x_grid_feedin = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
+    model.x_pv_p = pyo.Var(
+        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, pv_vals["p_max"])
+    )
     model.x_bss_p_charge = pyo.Var(
         DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, bss_vals["p_max"])
     )
@@ -115,10 +120,13 @@ def calc_opt_day(
             + model.x_cs_p_charge[t]
             + model.x_grid_feedin[t]
             + model.x_bss_p_charge[t]
-            == forecasts["pv_gen"][t]
-            + model.x_grid_load[t]
-            + model.x_bss_p_discharge[t]
+            == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
         )
+
+    # add constraints: pv - max generation
+    model.C_pv_power = pyo.ConstraintList()
+    for t in DAY_STEPS:
+        model.C_pv_power.add(expr=model.x_pv_p[t] <= forecasts["pv_gen"][t])
 
     # add constraints: ev - time coupling & only charge while home & full at end of day
     model.C_ev_start = pyo.Constraint(expr=model.x_ev_e[0] == ev_vals["end"])

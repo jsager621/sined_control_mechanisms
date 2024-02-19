@@ -25,10 +25,11 @@ def test_calc_opt_day():
     forecasts["hp_el_dem"][10:20] = 2000
     forecasts["hp_el_dem"][40:45] = 2000
     forecasts["hp_el_dem"][80:90] = 2000
+    pv_vals = {"p_max": 10000}
     bss_vals = {"end": 3000, "e_max": 5000, "p_max": 5000, "eff": 0.97}
     cs_vals = {"p_max": 11000, "eff": 0.95}
     ev_vals = {"end": 45000, "e_max": 45000}
 
-    profiles = calc_opt_day(forecasts, bss_vals, cs_vals, ev_vals)
+    profiles = calc_opt_day(forecasts, pv_vals, bss_vals, cs_vals, ev_vals)
 
     print(profiles)
