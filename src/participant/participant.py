@@ -2,6 +2,8 @@ from mango.agent.core import Agent
 import pyomo.environ as pyo
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 # Pyomo released under 3-clause BSD license
 
 GRANULARITY = 0.25
@@ -39,22 +41,20 @@ class NetParticipant(Agent):
 
 
 def calc_opt_day(
-    baseload: list,
-    pv_gen: list,
-    ev_cha: list,
-    hp_el_dem: list,
+    forecasts: dict,
     bss_vals: dict,
+    cs_vals: dict,
+    ev_vals: dict,
     elec_price=ELEC_PRICE,
     feedin_tariff=FEEDIN_TARIFF,
 ) -> dict:
     """Calculate the optimal schedule for the household based on profiles and parameters.
 
     Args:
-        baseload (list): baseload power demand profile
-        pv_gen (list): pv power generation profile
-        ev_cha (list): ev charging power profile
-        hp_el_dem (list): heatpump power demand profiles
-        bss_vals (dict): Info about bss - max power and energy plus energy level
+        forecasts (dict): forecasts for devices profiles (baseload, pv, ev, hp)
+        bss_vals (dict): Info about battery storage system - efficiency, max power and energy plus energy level
+        cs_vals (dict): Info about charging station - efficiency and max power
+        ev_vals (dict): Info about electric vehicle - max energy plus energy level
         elec_price (list, float): Single value or list of values for grid electricity price.
             Defaults to ELEC_PRICE.
         feedin_tariff (list, float): Single value or list of values for grid feedin price.
@@ -77,6 +77,18 @@ def calc_opt_day(
     model.x_bss_e = pyo.Var(
         DAY_STEPS_PLUS_1, domain=pyo.NonNegativeReals, bounds=(0, bss_vals["e_max"])
     )
+    model.x_cs_p_charge = pyo.Var(
+        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, cs_vals["p_max"])
+    )
+    model.x_cs_p_discharge = pyo.Var(
+        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, cs_vals["p_max"])
+    )
+    model.x_ev_e = pyo.Var(
+        DAY_STEPS_PLUS_1, domain=pyo.NonNegativeReals, bounds=(0, ev_vals["e_max"])
+    )
+    model.x_ev_pen = pyo.Var(
+        range(1), domain=pyo.NonNegativeReals, bounds=(0, ev_vals["e_max"])
+    )
 
     # add objective function
     if isinstance(elec_price, float):
@@ -91,27 +103,48 @@ def calc_opt_day(
                 for t in DAY_STEPS
             ]
         )
+        + 10 * model.x_ev_pen[0]
     )
 
     # add constraints: balance
     model.C_bal = pyo.ConstraintList()
     for t in DAY_STEPS:
         model.C_bal.add(
-            expr=baseload[t]
-            + hp_el_dem[t]
-            + ev_cha[t]
+            expr=forecasts["baseload"][t]
+            + forecasts["hp_el_dem"][t]
+            + model.x_cs_p_charge[t]
             + model.x_grid_feedin[t]
             + model.x_bss_p_charge[t]
-            == pv_gen[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
+            == forecasts["pv_gen"][t]
+            + model.x_grid_load[t]
+            + model.x_bss_p_discharge[t]
         )
 
-    # add constraints: ev
+    # add constraints: ev - time coupling & only charge while home & full at end of day
+    model.C_ev_start = pyo.Constraint(expr=model.x_ev_e[0] == ev_vals["end"])
+    model.C_ev_coupl = pyo.ConstraintList()
+    for t in DAY_STEPS:
+        e_adapt = (
+            model.x_cs_p_charge[t] * cs_vals["eff"]
+            - model.x_cs_p_discharge[t] / cs_vals["eff"]
+        ) * GRANULARITY
+        model.C_ev_coupl.add(
+            expr=model.x_ev_e[t + 1]
+            == model.x_ev_e[t] + e_adapt - forecasts["ev"]["consumption"][t]
+        )
+    model.C_ev_home = pyo.ConstraintList()
+    for t in DAY_STEPS:
+        if forecasts["ev"]["state"][t] != "home":
+            model.C_ev_home.add(expr=model.x_cs_p_charge[t] == 0)
+            model.C_ev_home.add(expr=model.x_cs_p_discharge[t] == 0)
+    model.C_ev_end = pyo.Constraint(
+        expr=model.x_ev_e[DAY_STEPS_PLUS_1[-1]] + model.x_ev_pen[0] == ev_vals["e_max"]
+    )
 
     # add constraints: hp
 
-    # add constraints: bss starting energy level - empty at beginning
+    # add constraints: bss - time coupling
     model.C_bss_start = pyo.Constraint(expr=model.x_bss_e[0] == bss_vals["end"])
-    # add constraints: bss time coupling
     model.C_bss_coupl = pyo.ConstraintList()
     for t in DAY_STEPS:
         e_adapt = (
@@ -122,18 +155,25 @@ def calc_opt_day(
 
     try:  # try solving it with gurobi, otherwise use opensource solver HiGHS
         opt = pyo.SolverFactory("gurobi")
-        log = opt.solve(model)
+        opt.solve(model)
     except:
         opt = pyo.SolverFactory("appsi_highs")
-        log = opt.solve(model)
+        opt.solve(model)
 
     profiles = {}
-    profiles["Baseload"] = baseload
-    profiles["PV"] = -pv_gen
-    profiles["EV"] = ev_cha
-    profiles["HP"] = hp_el_dem
+    profiles["Baseload"] = forecasts["baseload"]
+    profiles["PV"] = -forecasts["pv_gen"]
+    profiles["EV"] = np.round(model.x_cs_p_charge[:](), 1) - np.round(
+        model.x_cs_p_discharge[:](), 1
+    )
+    profiles["HP"] = forecasts["hp_el_dem"]
     profiles["BSS"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
         model.x_bss_p_discharge[:](), 1
     )
+    profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
+        model.x_grid_feedin[:](), 1
+    )
+    if model.x_ev_pen[0]() > 0:
+        print(f"Penalty variable for EV > 0: {np.round(model.x_ev_pen[0](), 1)}")
 
     return profiles
