@@ -70,6 +70,8 @@ def calc_opt_day(
     # add optimization variables
     model.x_grid_load = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
     model.x_grid_feedin = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
+    model.x_p_peak = pyo.Var(range(1), domain=pyo.NonNegativeReals)
+    model.x_p_valley = pyo.Var(range(1), domain=pyo.NonNegativeReals)
     model.x_pv_p = pyo.Var(
         DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, pv_vals["p_max"])
     )
@@ -102,12 +104,14 @@ def calc_opt_day(
         feedin_tariff = [feedin_tariff for _ in DAY_STEPS]
     ev_penalty = 10 * model.x_ev_pen[0]  # penalize non-filled ev battery
     ev_dir_cha = sum((t / 1e6 * model.x_cs_p_charge[t]) for t in range(len(DAY_STEPS)))
+    c_bss_energy = (feedin_tariff[-1] + elec_price[-1]) / 2
     bss_incent = (
-        -(feedin_tariff[-1] + elec_price[-1])
-        / 2
-        * model.x_bss_e[DAY_STEPS_PLUS_1[-1]]
-        / 1000
+        -c_bss_energy * model.x_bss_e[DAY_STEPS_PLUS_1[-1]] / 1000
     )  # incentive bss energy at the end to not randomly feed into grid but store for next day
+    c_peak = 0.01 / 1000  # peak price needs to be positive, height ist irrelevant
+    c_valley = (
+        min(c_bss_energy, np.mean(elec_price)) * GRANULARITY / 2 / 1000
+    )  # to reduce valley instead of keeping energy and to not use grid energy to reduce valley
     model.OBJ = pyo.Objective(
         expr=sum(
             [
@@ -119,6 +123,8 @@ def calc_opt_day(
         + ev_penalty
         + bss_incent
         + ev_dir_cha
+        + c_peak * model.x_p_peak[0]
+        + c_valley * model.x_p_valley[0]
     )
 
     # add constraints: balance
@@ -132,6 +138,14 @@ def calc_opt_day(
             + model.x_bss_p_charge[t]
             == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
         )
+
+    # add constraints: peak and valley
+    model.C_peak = pyo.ConstraintList()
+    for t in DAY_STEPS:
+        model.C_peak.add(expr=model.x_p_peak[0] >= model.x_grid_load[t])
+    model.C_val = pyo.ConstraintList()
+    for t in DAY_STEPS:
+        model.C_val.add(expr=model.x_p_valley[0] >= model.x_grid_feedin[t])
 
     # add constraints: pv - max generation
     model.C_pv_power = pyo.ConstraintList()
