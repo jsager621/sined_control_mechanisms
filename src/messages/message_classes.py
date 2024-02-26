@@ -27,6 +27,27 @@ def get_codec():
     return codec
 
 
+@dataclass
+class AgentAddress:
+    """
+    Dataclass for sending and receiving Agent Information
+    """
+
+    host: str
+    port: int
+    agent_id: str
+
+    def __eq__(self, other):
+        return (
+            self.host == other.host
+            and self.port == other.port
+            and self.agent_id == other.agent_id
+        )
+
+    def __hash__(self):
+        return hash(("host", self.host, "port", self.port, "agent_id", self.agent_id))
+
+
 """
 Message from central instance to participants
 """
@@ -87,11 +108,11 @@ Simulation time sync messages
 @json_serializable
 @dataclass
 class TimeStepMessage:
-    time: str
-    conversation_id: int
+    time: int
+    c_id: int
 
 
 @json_serializable
 @dataclass
 class TimeStepReply:
-    conversation_id: int
+    c_id: int
