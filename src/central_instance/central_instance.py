@@ -1,6 +1,7 @@
 from mango import Agent
 import pandapower as pp
 import pandapower.networks as ppnet
+from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
 
 
 class CentralInstance(Agent):
@@ -14,12 +15,30 @@ class CentralInstance(Agent):
 
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
-        print(f"Received a message with the following content: {content}")
+        sender_id = meta.get("sender_id", None)
+        sender_addr = meta.get("sender_addr", None)
+        sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
-    def _send_price_message(self, target, content):
-        pass
+        if isinstance(content, TimeStepMessage):
+            c_id = content.c_id
+            self.compute_time_step(content.time)
 
-    def _send_schedule_message(self, target, content):
+            # send reply
+            content = TimeStepReply(c_id)
+            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+
+            self.schedule_instant_acl_message(
+                content,
+                (sender.host, sender.port),
+                sender.agent_id,
+                acl_metadata=acl_meta,
+            )
+
+    def compute_time_step(self, timestamp):
+        # what should be done here?
+        # collect whatever agents have sent to central instance
+        # TODO maybe have to wait and ensure all agents have sent info
+        # -> can be added with a corresponding await here as necessary
         pass
 
     def init_grid(self, grid_name: str):
@@ -56,3 +75,6 @@ class CentralInstance(Agent):
     def run(self):
         # to proactively do things
         pass
+
+    def get_address(self):
+        return AgentAddress(self.addr[0], self.addr[1], self.aid)

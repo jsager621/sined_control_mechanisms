@@ -1,6 +1,8 @@
 from mango.agent.core import Agent
 import pyomo.environ as pyo
 import numpy as np
+from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
+
 
 # Pyomo released under 3-clause BSD license
 
@@ -25,17 +27,37 @@ class NetParticipant(Agent):
 
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
-        print(f"Received a message with the following content: {content}")
+        sender_id = meta.get("sender_id", None)
+        sender_addr = meta.get("sender_addr", None)
+        sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
-    def _handle_price_message(self, content, meta):
-        pass
+        if isinstance(content, TimeStepMessage):
+            c_id = content.c_id
+            self.compute_time_step(content.time)
 
-    def _handle_schedule_message(self, content, meta):
+            # send reply
+            content = TimeStepReply(c_id)
+            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+
+            self.schedule_instant_acl_message(
+                content,
+                (sender.host, sender.port),
+                sender.agent_id,
+                acl_metadata=acl_meta,
+            )
+
+    def compute_time_step(self, timestamp):
+        # what should be done here?
+        # recompute schedule every 24h
+        # what else?
         pass
 
     def run(self):
         # to proactively do things
         pass
+
+    def get_address(self):
+        return AgentAddress(self.addr[0], self.addr[1], self.aid)
 
 
 def calc_opt_day(
