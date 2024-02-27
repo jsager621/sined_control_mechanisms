@@ -1,18 +1,21 @@
 import asyncio
 from mango import create_container
-from src.central_instance import CentralInstance
-from src.participant import NetParticipant
+from central_instance import CentralInstance
+from participant import NetParticipant
+
 
 async def create_agents_and_containers():
     # TODO implement me
     # returns list of agents created via config
     pass
 
+
 async def simulation_done():
     # TODO implement me
     # can just be a simple future but as a function here to show the
     # intended flow
     pass
+
 
 def process_outputs(agents):
     pass
