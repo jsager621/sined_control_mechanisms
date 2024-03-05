@@ -148,6 +148,7 @@ class NetParticipant(Agent):
 
         # update result_timeseries_residual at last calculation of this timestamp
         # TODO!
+        self.result_timeseries_residual.append(self.residual_schedule)
 
         print(f"Participant calculated for timestamp {timestamp}.")
 
