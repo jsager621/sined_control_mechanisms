@@ -4,16 +4,7 @@ import numpy as np
 import pandas as pd
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
 
-
-import matplotlib.pyplot as plt
-
 # Pyomo released under 3-clause BSD license
-
-GRANULARITY = 0.25
-DAY_STEPS = range(int(24 / GRANULARITY))
-DAY_STEPS_PLUS_1 = range(int(24 / GRANULARITY + 1))
-ELEC_PRICE = 0.35
-FEEDIN_TARIFF = 0.07
 
 
 class NetParticipant(Agent):
@@ -21,6 +12,9 @@ class NetParticipant(Agent):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
         print(f"Hello world! My id is {self.aid}.")
+
+        # initialize list to store result data
+        self.result_timeseries_residual = []
 
         # TODO! Integrate the config data here in init
 
@@ -152,6 +146,9 @@ class NetParticipant(Agent):
         # schedule["bss_e"]) JUST FOR LAST SCHEDULE CALCULATION
         # TODO!
 
+        # update result_timeseries_residual at last calculation of this timestamp
+        # TODO!
+
         print(f"Participant calculated for timestamp {timestamp}.")
 
     def run(self):
@@ -173,8 +170,9 @@ def calc_opt_day(
     bss_vals: dict,
     cs_vals: dict,
     ev_vals: dict,
-    elec_price=ELEC_PRICE,
-    feedin_tariff=FEEDIN_TARIFF,
+    elec_price=0.35,
+    feedin_tariff=0.07,
+    step_size_s: int = 900,
 ) -> dict:
     """Calculate the optimal schedule for the household based on profiles and parameters.
 
@@ -185,13 +183,20 @@ def calc_opt_day(
         cs_vals (dict): Info about charging station - efficiency and max power
         ev_vals (dict): Info about electric vehicle - max energy plus energy level
         elec_price (list, float): Single value or list of values for grid electricity price.
-            Defaults to ELEC_PRICE.
+            Defaults to 0.35.
         feedin_tariff (list, float): Single value or list of values for grid feedin price.
-            Defaults to FEEDIN_TARIFF.
+            Defaults to 0.07.
+        step_size_s (int): Size of a simulation step in seconds. Defaults to 900 (=15 min).
 
     Returns:
         dict: schedules for the devices of the houeshold
     """
+    # create parameters
+    GRANULARITY = step_size_s / 3600
+    DAY_STEPS = range(int(24 / GRANULARITY))
+    DAY_STEPS_PLUS_1 = range(int(24 / GRANULARITY + 1))
+
+    # initialize model
     model = pyo.ConcreteModel()
 
     # add optimization variables
