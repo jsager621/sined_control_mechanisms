@@ -3,8 +3,9 @@ Collection of message classes used in the simulation.
 Each message class corresponds to one type of message.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, Iterable
+import numpy as np
 from mango.messages.codecs import json_serializable
 from mango.messages.codecs import JSON
 
@@ -14,12 +15,9 @@ def get_codec():
 
     codec.add_serializer(*NewElecPriceMessage.__serializer__())
     codec.add_serializer(*NewFeedinTariffMessage.__serializer__())
-    codec.add_serializer(*MaxNetFeedinMessage.__serializer__())
-    codec.add_serializer(*MaxNetLoadMessage.__serializer__())
+    codec.add_serializer(*ControlResidualMessage.__serializer__())
 
-    codec.add_serializer(*LocalLoadMessage.__serializer__())
-    codec.add_serializer(*LocalFeedinMessage.__serializer__())
-    codec.add_serializer(*LocalVoltageMessage.__serializer__())
+    codec.add_serializer(*LocalResidualScheduleMessage.__serializer__())
 
     codec.add_serializer(*TimeStepMessage.__serializer__())
     codec.add_serializer(*TimeStepReply.__serializer__())
@@ -49,32 +47,38 @@ class AgentAddress:
 
 
 """
+Base Message to include timestep for the sent signal to indicate for which time step it is meant
+"""
+
+
+@json_serializable
+@dataclass
+class BaseMessage:
+    timestep: int
+
+
+"""
 Message from central instance to participants
 """
 
 
 @json_serializable
 @dataclass
-class NewElecPriceMessage:
-    price: float
+class NewElecPriceMessage(BaseMessage):
+    price: float = field(default=None)
 
 
 @json_serializable
 @dataclass
-class NewFeedinTariffMessage:
-    tariff: float
+class NewFeedinTariffMessage(BaseMessage):
+    tariff: float = field(default=None)
 
 
 @json_serializable
 @dataclass
-class MaxNetFeedinMessage:
-    max_feedin: float
-
-
-@json_serializable
-@dataclass
-class MaxNetLoadMessage:
-    max_load: float
+class ControlResidualMessage(BaseMessage):
+    p_max: float = field(default=None)
+    p_min: float = field(default=None)
 
 
 """
@@ -84,20 +88,8 @@ Message from participants to central instance
 
 @json_serializable
 @dataclass
-class LocalLoadMessage:
-    load: float
-
-
-@json_serializable
-@dataclass
-class LocalFeedinMessage:
-    feedin: float
-
-
-@json_serializable
-@dataclass
-class LocalVoltageMessage:
-    voltage: float
+class LocalResidualScheduleMessage:
+    residual_schedule: np.ndarray[float]
 
 
 """

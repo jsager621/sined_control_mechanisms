@@ -4,6 +4,8 @@ import pandapower as pp
 import pandapower.networks as ppnet
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
 
+# Pandapower Copyright (c) 2018 by University of Kassel and Fraunhofer IEE
+
 
 class CentralInstance(Agent):
     grid = None  # pandapower net object
