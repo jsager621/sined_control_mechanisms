@@ -1,6 +1,7 @@
 from mango.agent.core import Agent
 import pyomo.environ as pyo
 import numpy as np
+import pandas as pd
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
 
 
@@ -21,11 +22,59 @@ class NetParticipant(Agent):
         super().__init__(container)
         print(f"Hello world! My id is {self.aid}.")
 
-        # TODO: units?
-        self._feed_in = 0
-        self._load = 0
+        # TODO! Integrate the config data here in init
 
-        # TODO presumably we can directly use some pandapower components here to abstract the actual assets for us?
+        # store length of one simulation step
+        self.step_size_s = 15 * 60  # 15 min steps, 900 seconds
+
+        # store tariff info
+        self.tariff = {"electricity_price": 0.35, "feedin_tariff": 0.07}
+
+        # store paths for the profiles (and corresponding columns)
+        self.paths = {
+            "load": "data/household_load.csv",
+            "pv": "data/pv_10kw.csv",
+            "ev": "data/ev_45kWh.csv",
+            "hp": "data/heatpump.csv",
+        }
+        columns = {
+            "load": "                P # [W]",
+            "pv": "                P # [W]",
+            "ev": {"state": "state", "consumption": "consumption"},
+            "hp": "P_TOT",
+        }
+
+        # store forecast profiles
+        self.forecast = {}
+        self.forecast["load"] = self.load_csv(
+            path_to_csv=self.paths["load"], col_name=columns["load"]
+        )
+        self.forecast["pv"] = self.load_csv(
+            path_to_csv=self.paths["pv"], col_name=columns["pv"], n_header=0
+        )
+        self.forecast["hp"] = self.load_csv(
+            path_to_csv=self.paths["hp"], col_name=columns["hp"]
+        )
+        self.forecast["ev"] = {}
+        self.forecast["ev"]["state"] = self.load_csv(
+            path_to_csv=self.paths["ev"], col_name=columns["ev"]["state"], n_header=0
+        )
+        self.forecast["ev"]["consumption"] = self.load_csv(
+            path_to_csv=self.paths["ev"],
+            col_name=columns["ev"]["consumption"],
+            n_header=0,
+        )
+
+        # store data of the devices
+        self.dev = {}
+        self.dev["pv"] = {"power_kWp": 10}
+        self.dev["bss"] = {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95}
+        self.dev["ev"] = {"capacity_kWh": 45}
+        self.dev["cs"] = {"power_kW": 11, "efficiency": 0.95}
+
+        # initialize residual schedule of the day with zeros for each value
+        self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
+        # NOTE positive values are power demand, negative values are generation
 
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
@@ -49,10 +98,23 @@ class NetParticipant(Agent):
             )
 
     def compute_time_step(self, timestamp):
-        # what should be done here?
-        # recompute schedule every 24h
-        # what else?
-        pass
+        # retrieve forecasts for this day (with given timestamp and stepsize)
+        # TODO!
+        forecasts = {}
+
+        # compute schedule for upcoming day
+        schedule = calc_opt_day(
+            forecasts=forecasts,
+            pv_vals=self.dev["pv"],
+            bss_vals=self.dev["bss"],
+            cs_vals=self.dev["cs"],
+            ev_vals=self.dev["ev"],
+            elec_price=self.tariff["electricity_price"],
+            feedin_tariff=self.tariff["feedin_tariff"],
+        )
+
+        # retrieve residual schedule
+        self.residual_schedule = schedule["p_res"]
 
     def run(self):
         # to proactively do things
@@ -60,6 +122,11 @@ class NetParticipant(Agent):
 
     def get_address(self):
         return AgentAddress(self.addr[0], self.addr[1], self.aid)
+
+    def load_csv(self, path_to_csv, col_name, n_header=1) -> np.ndarray:
+        df = pd.read_csv(path_to_csv, index_col=0, parse_dates=[0], header=n_header)
+        profile = df.loc[:, col_name].to_numpy()
+        return profile
 
 
 def calc_opt_day(
@@ -153,7 +220,7 @@ def calc_opt_day(
     model.C_bal = pyo.ConstraintList()
     for t in DAY_STEPS:
         model.C_bal.add(
-            expr=forecasts["baseload"][t]
+            expr=forecasts["load"][t]
             + forecasts["hp_el_dem"][t]
             + model.x_cs_p_charge[t]
             + model.x_grid_feedin[t]
@@ -215,16 +282,16 @@ def calc_opt_day(
         opt.solve(model)
 
     profiles = {}
-    profiles["Baseload"] = forecasts["baseload"]
-    profiles["PV"] = -forecasts["pv_gen"]
-    profiles["EV"] = np.round(model.x_cs_p_charge[:](), 1) - np.round(
+    profiles["load"] = forecasts["load"]
+    profiles["pv"] = -forecasts["pv_gen"]
+    profiles["ev"] = np.round(model.x_cs_p_charge[:](), 1) - np.round(
         model.x_cs_p_discharge[:](), 1
     )
-    profiles["HP"] = forecasts["hp_el_dem"]
-    profiles["BSS"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
+    profiles["hp"] = forecasts["hp_el_dem"]
+    profiles["bss"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
         model.x_bss_p_discharge[:](), 1
     )
-    profiles["BSS_e"] = np.round(model.x_bss_e[:](), 1)
+    profiles["bss_e"] = np.round(model.x_bss_e[:](), 1)
     profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
         model.x_grid_feedin[:](), 1
     )
