@@ -1,5 +1,5 @@
 from mango import Agent
-import random
+import asyncio
 import pandapower as pp
 import pandapower.networks as ppnet
 import logging
@@ -14,6 +14,8 @@ from messages.message_classes import (
 from util import time_int_to_str, read_grid_config
 
 # Pandapower Copyright (c) 2018 by University of Kassel and Fraunhofer IEE
+
+ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 
 class CentralInstance(Agent):
@@ -55,6 +57,7 @@ class CentralInstance(Agent):
             )
 
         self.load_participant_coord = {}
+        self.received_schedules = {}
 
         # store type of current control form
         self.control_type = self.grid_config["CONTROL_TYPE"]
@@ -67,17 +70,8 @@ class CentralInstance(Agent):
         acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
 
         if isinstance(content, TimeStepMessage):
-            c_id = content.c_id
-            self.compute_time_step(content.time)
-
-            # send reply
-            content = TimeStepReply(c_id)
-
-            self.schedule_instant_acl_message(
-                content,
-                (sender.host, sender.port),
-                sender.agent_id,
-                acl_metadata=acl_meta,
+            self.schedule_instant_task(
+                self.compute_time_step(content.time, sender, content.c_id)
             )
 
         # no need to sync this because we run it synchronized from the simulation setup file
@@ -98,7 +92,14 @@ class CentralInstance(Agent):
 
         if isinstance(content, LocalResidualScheduleMessage):
             logging.info(f"Got residual schedule message from agent: {sender}")
+
             # TODO what needs to happen with this?
+            if content.timestamp in self.received_schedules.keys():
+                self.received_schedules[content.timestamp].append(
+                    content.residual_schedule
+                )
+            else:
+                self.received_schedules[content.timestamp] = [content.residual_schedule]
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
@@ -109,18 +110,25 @@ class CentralInstance(Agent):
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
             )
 
-    def compute_time_step(self, timestamp):
+    async def get_participant_schedules(self, timestamp):
+        # TODO make this nicer with futures?
+        while timestamp not in self.received_schedules.keys():
+            await asyncio.sleep(0.01)
+
+        while len(self.received_schedules[timestamp]) < self.num_participants:
+            await asyncio.sleep(0.01)
+
+    async def compute_time_step(self, timestamp, sender, c_id):
         # collect agents residual schedules
-        # TODO!
+        await self.get_participant_schedules(timestamp)
+
         # form: power_for_buses = {"loadbus_1_1": 2}
+        # TODO: set me correctly
         power_for_buses = {
             self.grid.bus.loc[i_bus, "name"]: 1
             for i_bus in range(len(self.grid.bus))
             if "loadbus" in self.grid.bus.loc[i_bus, "name"]
         }
-
-        # TODO maybe have to wait and ensure all agents have sent info
-        # -> can be added with a corresponding await here as necessary
 
         # initialize schedule results list
         list_results_bus = {}
@@ -131,6 +139,7 @@ class CentralInstance(Agent):
             list_results_line[line_name] = []
 
         # go by each time step (TODO! dynamically)
+        # TODO 15 minute steps?
         for step in range(96):
             # set the inputs from the agents schedules
             self.set_inputs(data_for_buses=power_for_buses)
@@ -157,6 +166,16 @@ class CentralInstance(Agent):
             self.result_timeseries_line_load[line_name].append(
                 list_results_line[line_name]
             )
+
+        # send reply
+        content = TimeStepReply(c_id)
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+        self.schedule_instant_acl_message(
+            content,
+            (sender.host, sender.port),
+            sender.agent_id,
+            acl_metadata=acl_meta,
+        )
 
         print(
             f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."

@@ -98,6 +98,7 @@ Message from participants to central instance
 @json_serializable
 @dataclass
 class LocalResidualScheduleMessage:
+    timestamp: int
     residual_schedule: np.ndarray[float]
 
 
