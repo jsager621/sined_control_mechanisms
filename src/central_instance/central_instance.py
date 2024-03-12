@@ -98,6 +98,7 @@ class CentralInstance(Agent):
 
         if isinstance(content, LocalResidualScheduleMessage):
             logging.info(f"Got residual schedule message from agent: {sender}")
+            # TODO what needs to happen with this?
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
