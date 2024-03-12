@@ -1,19 +1,24 @@
 from datetime import datetime
 import os
 import pandas as pd
-import logging
+import json
 
 """
 Collection of utility functions for the simulation.
 """
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR = os.path.join(THIS_DIR, "..", "data")
 
+DATA_DIR = os.path.join(THIS_DIR, "..", "data")
 EV_FILE = os.path.join(DATA_DIR, "ev_45kWh.csv")
 HEATPUMP_FILE = os.path.join(DATA_DIR, "heatpump.csv")
 HOUSEHOLD_FILE = os.path.join(DATA_DIR, "household_load.csv")
 PV_FILE = os.path.join(DATA_DIR, "pv_10kw.csv")
+
+CONFIG_DIR = os.path.join(THIS_DIR, "..", "config")
+GRID_CONFIG = os.path.join(CONFIG_DIR, "grid.json")
+PROSUMER_CONFIG = os.path.join(CONFIG_DIR, "prosumer.json")
+SIMULATION_CONFIG = os.path.join(CONFIG_DIR, "simulation.json")
 
 
 # Singleton class to ensure csv files are read only once per process
@@ -106,8 +111,21 @@ def read_pv_data(timestamp_int):
     )
 
 
-if __name__ == "__main__":
-    print(read_ev_data(1577844900))
-    print(read_heatpump_data(1577844900))
-    print(read_household_data(1577844900))
-    print(read_pv_data(1577844900))
+def read_json(json_file):
+    data = {}
+    with open(json_file, "r") as f:
+        data = json.load(f)
+
+    return data
+
+
+def read_prosumer_config():
+    return read_json(PROSUMER_CONFIG)
+
+
+def read_grid_config():
+    return read_json(GRID_CONFIG)
+
+
+def read_simulation_config():
+    return read_json(SIMULATION_CONFIG)
