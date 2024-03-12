@@ -5,6 +5,7 @@ from participant import NetParticipant
 from syncing_agent import SyncingAgent
 from messages.message_classes import get_codec
 from datetime import datetime
+from util import read_simulation_config
 
 HOST = "localhost"
 PORT = 5555
@@ -34,9 +35,10 @@ def process_outputs(agents):
 
 async def main():
     sync_agent, participants, containers = await create_agents_and_containers()
+    config = read_simulation_config()
 
-    str_start = "2020-01-01 01:00:00"
-    str_end = "2020-01-01 02:00:00"
+    str_start = config["start_time"]
+    str_end = config["end_time"]
     unix_start = datetime.fromisoformat(str_start).timestamp()
     unix_end = datetime.fromisoformat(str_end).timestamp()
 
