@@ -60,6 +60,9 @@ class DataReader(object):
 
 
 def time_str_to_int(timestamp_str):
+    # hack to enforce utc timestamp because it's annoying
+    if not "+" in timestamp_str:
+        timestamp_str += "+00:00"
     return int(datetime.fromisoformat(timestamp_str).timestamp())
 
 

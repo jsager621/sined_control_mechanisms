@@ -11,6 +11,7 @@ from messages.message_classes import (
     AgentAddress,
     RegistrationMessage,
     RegistrationReply,
+    LocalResidualScheduleMessage,
 )
 from util import (
     read_ev_data,
@@ -146,6 +147,18 @@ class NetParticipant(Agent):
         # update result_timeseries_residual at last calculation of this timestamp
         # TODO!
         self.result_timeseries_residual.append(self.residual_schedule)
+
+        # inform central instance about residual schedule
+        # TODO is this correct?
+        content = LocalResidualScheduleMessage(self.residual_schedule)
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+
+        self.schedule_instant_acl_message(
+            content,
+            (self.central_agent.host, self.central_agent.port),
+            self.central_agent.agent_id,
+            acl_metadata=acl_meta,
+        )
 
     def run(self):
         # to proactively do things

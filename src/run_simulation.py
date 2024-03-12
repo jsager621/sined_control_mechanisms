@@ -6,7 +6,7 @@ from participant import NetParticipant
 from syncing_agent import SyncingAgent
 from messages.message_classes import get_codec
 from datetime import datetime
-from util import read_simulation_config, read_grid_config
+from util import read_simulation_config, read_grid_config, time_str_to_int
 
 HOST = "localhost"
 PORT = 5555
@@ -39,8 +39,8 @@ async def main():
 
     str_start = sim_config["start_time"]
     str_end = sim_config["end_time"]
-    unix_start = datetime.fromisoformat(str_start).timestamp()
-    unix_end = datetime.fromisoformat(str_end).timestamp()
+    unix_start = time_str_to_int(str_start)
+    unix_end = time_str_to_int(str_end)
 
     grid_config = read_grid_config()
     n_participants = grid_config["NUM_PARTICIPANTS"]

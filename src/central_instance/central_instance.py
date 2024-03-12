@@ -9,6 +9,7 @@ from messages.message_classes import (
     AgentAddress,
     RegistrationMessage,
     RegistrationReply,
+    LocalResidualScheduleMessage,
 )
 from util import time_int_to_str, read_grid_config
 
@@ -94,6 +95,9 @@ class CentralInstance(Agent):
                 sender.agent_id,
                 acl_metadata=acl_meta,
             )
+
+        if isinstance(content, LocalResidualScheduleMessage):
+            logging.info(f"Got residual schedule message from agent: {sender}")
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
