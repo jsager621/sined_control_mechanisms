@@ -2,7 +2,16 @@ from mango.agent.core import Agent
 import pyomo.environ as pyo
 import numpy as np
 import pandas as pd
-from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
+import asyncio
+import logging
+
+from messages.message_classes import (
+    TimeStepMessage,
+    TimeStepReply,
+    AgentAddress,
+    RegistrationMessage,
+    RegistrationReply,
+)
 from util import (
     read_ev_data,
     read_pv_data,
@@ -22,7 +31,9 @@ class NetParticipant(Agent):
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
-        print(f"Hello world! My id is {self.aid}.")
+
+        self.central_agent = None
+        self.registration_future = None
 
         # initialize list to store result data
         self.result_timeseries_residual = []
@@ -45,6 +56,23 @@ class NetParticipant(Agent):
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
         # NOTE positive values are power demand, negative values are generation
 
+    async def register_to_central_agent(self, central_address):
+        # send message
+        content = RegistrationMessage()
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+        self.registration_future = asyncio.Future()
+
+        self.schedule_instant_acl_message(
+            content,
+            (central_address.host, central_address.port),
+            central_address.agent_id,
+            acl_metadata=acl_meta,
+        )
+
+        # await reply
+        await self.registration_future
+        logging.info("agent succesfully registered")
+
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
         sender_id = meta.get("sender_id", None)
@@ -65,6 +93,12 @@ class NetParticipant(Agent):
                 sender.agent_id,
                 acl_metadata=acl_meta,
             )
+
+        if isinstance(content, RegistrationReply):
+            if content.ack:
+                self.central_agent = sender
+
+            self.registration_future.set_result(True)
 
     def compute_time_step(self, timestamp):
         # retrieve forecasts for this day (with given timestamp and stepsize)

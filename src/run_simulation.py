@@ -12,21 +12,18 @@ PORT = 5555
 
 
 async def create_agents_and_containers():
-    # TODO implement me
     # returns list of agents created via config
     # everything single container for now because no reason not to
 
     c = await create_container(addr=(HOST, PORT), codec=get_codec())
 
-    agents = [
-        NetParticipant(c),
-        NetParticipant(c),
-        NetParticipant(c),
-        CentralInstance(c),
-    ]
+    participants = [NetParticipant(c), NetParticipant(c), NetParticipant(c)]
+    central_instance = CentralInstance(c)
+    agents = participants + [central_instance]
+
     agent_addresses = [a.get_address() for a in agents]
     sync_agent = SyncingAgent(c, agent_addresses)
-    return (sync_agent, agents, [c])
+    return (sync_agent, participants, central_instance, [c])
 
 
 def process_outputs(agents):
@@ -34,13 +31,18 @@ def process_outputs(agents):
 
 
 async def main():
-    sync_agent, participants, containers = await create_agents_and_containers()
     config = read_simulation_config()
-
     str_start = config["start_time"]
     str_end = config["end_time"]
     unix_start = datetime.fromisoformat(str_start).timestamp()
     unix_end = datetime.fromisoformat(str_end).timestamp()
+
+    sync_agent, participants, central_instance, containers = (
+        await create_agents_and_containers()
+    )
+
+    for p in participants:
+        await p.register_to_central_agent(central_instance.get_address())
 
     # in current implementation agents are reactive so we only need to run
     # the simulation agent here
@@ -50,7 +52,8 @@ async def main():
         await c.shutdown()
 
     # presumably do some data collecting and saving here
-    process_outputs(participants)
+    agents = participants.append(central_instance)
+    process_outputs(agents)
 
 
 if __name__ == "__main__":
