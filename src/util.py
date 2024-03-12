@@ -31,10 +31,31 @@ class DataReader(object):
 
     def __init__(self):
         # read in the four data files
-        self.ev_data = pd.read_csv(EV_FILE)
-        self.heatpump_data = pd.read_csv(HEATPUMP_FILE)
-        self.household_data = pd.read_csv(HOUSEHOLD_FILE)
-        self.pv_data = pd.read_csv(PV_FILE)
+        raw_ev_data = pd.read_csv(EV_FILE).to_numpy()
+        raw_heatpump_data = pd.read_csv(HEATPUMP_FILE).to_numpy()
+        raw_household_data = pd.read_csv(HOUSEHOLD_FILE).to_numpy()
+        raw_pv_data = pd.read_csv(PV_FILE).to_numpy()
+
+        # parse all timestamps to unix time
+        raw_ev_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_ev_data[:, 0]
+        ]
+        self.ev_data = raw_ev_data
+
+        raw_heatpump_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_heatpump_data[:, 0]
+        ]
+        self.heatpump_data = raw_heatpump_data
+
+        raw_household_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_household_data[:, 0]
+        ]
+        self.household_data = raw_household_data
+
+        raw_pv_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_pv_data[:, 0]
+        ]
+        self.pv_data = raw_pv_data
 
 
 def time_str_to_int(timestamp_str):
@@ -45,57 +66,47 @@ def time_int_to_str(timestamp_int):
     return str(datetime.utcfromtimestamp(timestamp_int))
 
 
-def read_ev_data(timestamp_int):
+def read_ev_data(t_start, t_end):
     reader = DataReader()
-    str_timestamp = time_int_to_str(timestamp_int)
-    row_data = reader.ev_data.loc[reader.ev_data["date"] == str_timestamp]
+    np_data = reader.ev_data
+    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
+    rows = np_data[mask]
 
-    if row_data.empty:
-        raise ValueError(
-            f"Tried to read ev data with unknown timestamp: {str_timestamp}"
-        )
-
-    return (
-        row_data["date"].item(),
-        row_data["state"].item(),
-        row_data["consumption"].item(),
-    )
+    # return state and consumption as separate np arrays
+    return (rows[:, 1].astype("S"), rows[:, 2].astype("f"))
 
 
-def read_heatpump_data(timestamp_int):
+def read_heatpump_data(t_start, t_end):
     reader = DataReader()
-    str_timestamp = time_int_to_str(timestamp_int)
-    row_data = reader.heatpump_data.loc[reader.heatpump_data["date"] == str_timestamp]
+    np_data = reader.heatpump_data
+    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
+    rows = np_data[mask]
 
-    if row_data.empty:
-        raise ValueError(
-            f"Tried to read heatpump data with unknown timestamp: {str_timestamp}"
-        )
-
-    return (
-        row_data["date"].item(),
-        row_data["P_TOT"].item(),
-        row_data["Q_TOT"].item(),
-    )
+    # return P_TOT and Q_TOT as separate np arrays
+    return (rows[:, 1].astype("f"), rows[:, 2].astype("f"))
 
 
-def read_household_data(timestamp_int):
+def read_household_data(t_start, t_end):
     reader = DataReader()
-    str_timestamp = time_int_to_str(timestamp_int)
-    row_data = reader.household_data.loc[reader.household_data["date"] == str_timestamp]
+    np_data = reader.household_data
+    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
+    rows = np_data[mask]
 
-    if row_data.empty:
-        raise ValueError(
-            f"Tried to read household data with unknown timestamp: {str_timestamp}"
-        )
-
-    return (
-        row_data["date"].item(),
-        row_data["P_IN_W"].item(),
-    )
+    # return P_IN_W
+    return rows[:, 1].astype("f")
 
 
-def read_pv_data(timestamp_int):
+def read_pv_data(t_start, t_end):
+    reader = DataReader()
+    np_data = reader.pv_data
+    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
+    rows = np_data[mask]
+
+    # return P_IN_W
+    return rows[:, 1].astype("f")
+
+
+def read_load_data(t_start, t_end):
     reader = DataReader()
     str_timestamp = time_int_to_str(timestamp_int)
     row_data = reader.pv_data.loc[reader.pv_data["date"] == str_timestamp]

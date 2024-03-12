@@ -16,7 +16,10 @@ def test_json_readers():
 
 
 def test_data_readers():
-    read_ev_data(1577844900)
-    read_heatpump_data(1577844900)
-    read_household_data(1577844900)
-    read_pv_data(1577844900)
+    t_start = 1577844900
+    t_end = 1577844900 + 4 * 15 * 60
+
+    read_ev_data(t_start, t_end)
+    read_heatpump_data(t_start, t_end)
+    read_household_data(t_start, t_end)
+    read_pv_data(t_start, t_end)
