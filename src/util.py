@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import pandas as pd
+import numpy as np
 import json
 
 """
@@ -107,19 +108,17 @@ def read_pv_data(t_start, t_end):
 
 
 def read_load_data(t_start, t_end):
+    # TODO add this
+    # return dummy data for now
+    return 0.5 * np.ones(96)
+
     reader = DataReader()
-    str_timestamp = time_int_to_str(timestamp_int)
-    row_data = reader.pv_data.loc[reader.pv_data["date"] == str_timestamp]
+    np_data = reader.load_data
+    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
+    rows = np_data[mask]
 
-    if row_data.empty:
-        raise ValueError(
-            f"Tried to read pv data with unknown timestamp: {str_timestamp}"
-        )
-
-    return (
-        row_data["date"].item(),
-        row_data["P_IN_W"].item(),
-    )
+    # return P_IN_W
+    return rows[:, 1].astype("f")
 
 
 def read_json(json_file):

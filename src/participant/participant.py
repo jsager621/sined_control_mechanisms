@@ -3,13 +3,14 @@ import pyomo.environ as pyo
 import numpy as np
 import pandas as pd
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
-from src.util import (
+from util import (
     read_ev_data,
     read_pv_data,
     read_household_data,
     read_heatpump_data,
     read_load_data,
     read_prosumer_config,
+    time_int_to_str,
 )
 
 ONE_DAY_IN_SECONDS = 24 * 60 * 60
@@ -71,7 +72,9 @@ class NetParticipant(Agent):
         if timestamp % ONE_DAY_IN_SECONDS == 0:
             self.compute_day_ahead_schedule(timestamp)
 
-        print(f"Participant calculated for timestamp {timestamp}.")
+        print(
+            f"Participant calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+        )
 
     def compute_day_ahead_schedule(self, timestamp):
         t_start = timestamp

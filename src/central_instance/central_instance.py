@@ -3,6 +3,7 @@ import random
 import pandapower as pp
 import pandapower.networks as ppnet
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
+from util import time_int_to_str
 
 # Pandapower Copyright (c) 2018 by University of Kassel and Fraunhofer IEE
 
@@ -121,7 +122,9 @@ class CentralInstance(Agent):
                 list_results_line[line_name]
             )
 
-        print(f"Central Instance calculated for timestamp {timestamp}.")
+        print(
+            f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+        )
 
     def init_grid(self, grid_name: str):
         if grid_name == "kerber_dorfnetz":
