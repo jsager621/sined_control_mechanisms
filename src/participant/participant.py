@@ -3,6 +3,16 @@ import pyomo.environ as pyo
 import numpy as np
 import pandas as pd
 from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
+from src.util import (
+    read_ev_data,
+    read_pv_data,
+    read_household_data,
+    read_heatpump_data,
+    read_load_data,
+    read_prosumer_config,
+)
+
+ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 # Pyomo released under 3-clause BSD license
 
@@ -16,67 +26,19 @@ class NetParticipant(Agent):
         # initialize list to store result data
         self.result_timeseries_residual = []
 
-        # TODO! Integrate the config data here in init
-
         # store length of one simulation step
         self.step_size_s = 15 * 60  # 15 min steps, 900 seconds
 
-        # store tariff info
-        self.tariff = {"electricity_price": 0.35, "feedin_tariff": 0.07}
-
-        # store paths for the profiles (and corresponding columns)
-        self.paths = {
-            "load": "data/household_load.csv",
-            "pv": "data/pv_10kw.csv",
-            "ev": "data/ev_45kWh.csv",
-            "hp": "data/heatpump.csv",
-        }
-        columns = {
-            "load": "                P # [W]",
-            "pv": "                P # [W]",
-            "ev": {"state": "state", "consumption": "consumption"},
-            "hp": "P_TOT",
-        }
-
-        # store forecast profiles
-        self.forecast = {}
-        self.forecast["load"] = (
-            self.load_csv(path_to_csv=self.paths["load"], col_name=columns["load"])
-            / 1000
-        )
-        self.forecast["pv"] = (
-            self.load_csv(
-                path_to_csv=self.paths["pv"], col_name=columns["pv"], n_header=0
-            )
-            / 1000
-        )
-        self.forecast["hp"] = (
-            self.load_csv(path_to_csv=self.paths["hp"], col_name=columns["hp"]) / 1000
-        )
-        self.forecast["ev"] = {}
-        self.forecast["ev"]["state"] = self.load_csv(
-            path_to_csv=self.paths["ev"], col_name=columns["ev"]["state"], n_header=0
-        )
-        self.forecast["ev"]["consumption"] = (
-            self.load_csv(
-                path_to_csv=self.paths["ev"],
-                col_name=columns["ev"]["consumption"],
-                n_header=0,
-            )
-            / 1000
-        )
+        # read config
+        self.config = read_prosumer_config()
+        self.tariff = self.config["TARIFF"]
 
         # store data of the devices
         self.dev = {}
-        self.dev["pv"] = {"power_kWp": 10}
-        self.dev["bss"] = {
-            "capacity_kWh": 10,
-            "power_kW": 10,
-            "efficiency": 0.95,
-            "e_kWh": 5,
-        }
-        self.dev["ev"] = {"capacity_kWh": 45, "e_kWh": 45}
-        self.dev["cs"] = {"power_kW": 11, "efficiency": 0.95}
+        self.dev["pv"] = self.config["HOUSEHOLD"]["pv"]
+        self.dev["bss"] = self.config["HOUSEHOLD"]["bss"]
+        self.dev["ev"] = self.config["HOUSEHOLD"]["ev"]
+        self.dev["cs"] = self.config["HOUSEHOLD"]["cs"]
 
         # initialize residual schedule of the day with zeros for each value
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
@@ -105,28 +67,26 @@ class NetParticipant(Agent):
 
     def compute_time_step(self, timestamp):
         # retrieve forecasts for this day (with given timestamp and stepsize)
-        # TODO!
+        # check if this is 00:00:00 on some day
+        if timestamp % ONE_DAY_IN_SECONDS == 0:
+            self.compute_day_ahead_schedule(timestamp)
+
+        print(f"Participant calculated for timestamp {timestamp}.")
+
+    def compute_day_ahead_schedule(self, timestamp):
+        t_start = timestamp
+        t_end = timestamp + ONE_DAY_IN_SECONDS
+
         forecasts = {}
-        forecasts["load"] = 0.5 * np.ones(96)
-        forecasts["pv"] = np.zeros(96)
-        forecasts["pv"][30:65] -= 1
-        forecasts["pv"][36:59] -= 1
-        forecasts["pv"][41:54] -= 1.2
-        forecasts["pv"][44:51] -= 1
-        forecasts["pv"][47:48] -= 0.8
         forecasts["ev"] = {}
-        forecasts["ev"]["state"] = ["home"] * 96
-        forecasts["ev"]["consumption"] = np.zeros(96)
-        forecasts["ev"]["state"][35] = "driving"
-        for t in range(36, 70):
-            forecasts["ev"]["state"][t] = "workplace"
-        forecasts["ev"]["state"][70] = "driving"
-        forecasts["ev"]["consumption"][35] = 5
-        forecasts["ev"]["consumption"][70] = 5
-        forecasts["hp"] = np.zeros(96)
-        forecasts["hp"][10:20] = 2
-        forecasts["hp"][40:45] = 2
-        forecasts["hp"][80:90] = 2
+
+        forecasts["load"] = read_load_data(t_start, t_end)
+        forecasts["pv"] = read_pv_data(t_start, t_end)
+        forecasts["ev"]["state"], forecasts["ev"]["consumption"] = read_ev_data(
+            t_start, t_end
+        )
+        # only care about P_TOT here
+        forecasts["hp"] = read_heatpump_data(t_start, t_end)[0]
 
         # compute schedule for upcoming day
         schedule = calc_opt_day(
@@ -150,19 +110,12 @@ class NetParticipant(Agent):
         # TODO!
         self.result_timeseries_residual.append(self.residual_schedule)
 
-        print(f"Participant calculated for timestamp {timestamp}.")
-
     def run(self):
         # to proactively do things
         pass
 
     def get_address(self):
         return AgentAddress(self.addr[0], self.addr[1], self.aid)
-
-    def load_csv(self, path_to_csv, col_name, n_header=1) -> np.ndarray:
-        df = pd.read_csv(path_to_csv, index_col=0, parse_dates=[0], header=n_header)
-        profile_kW = df.loc[:, col_name].to_numpy()
-        return profile_kW
 
 
 def calc_opt_day(
