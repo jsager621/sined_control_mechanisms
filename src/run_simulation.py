@@ -1,23 +1,27 @@
 import asyncio
+import logging
 from mango import create_container
 from central_instance import CentralInstance
 from participant import NetParticipant
 from syncing_agent import SyncingAgent
 from messages.message_classes import get_codec
 from datetime import datetime
-from util import read_simulation_config
+from util import read_simulation_config, read_grid_config
 
 HOST = "localhost"
 PORT = 5555
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
-async def create_agents_and_containers():
+
+async def create_agents_and_containers(n_participants):
     # returns list of agents created via config
     # everything single container for now because no reason not to
 
     c = await create_container(addr=(HOST, PORT), codec=get_codec())
 
-    participants = [NetParticipant(c), NetParticipant(c), NetParticipant(c)]
+    participants = [NetParticipant(c) for i in range(n_participants)]
     central_instance = CentralInstance(c)
     agents = participants + [central_instance]
 
@@ -31,14 +35,18 @@ def process_outputs(agents):
 
 
 async def main():
-    config = read_simulation_config()
-    str_start = config["start_time"]
-    str_end = config["end_time"]
+    sim_config = read_simulation_config()
+
+    str_start = sim_config["start_time"]
+    str_end = sim_config["end_time"]
     unix_start = datetime.fromisoformat(str_start).timestamp()
     unix_end = datetime.fromisoformat(str_end).timestamp()
 
+    grid_config = read_grid_config()
+    n_participants = grid_config["NUM_PARTICIPANTS"]
+
     sync_agent, participants, central_instance, containers = (
-        await create_agents_and_containers()
+        await create_agents_and_containers(n_participants)
     )
 
     for p in participants:

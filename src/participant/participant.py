@@ -106,8 +106,8 @@ class NetParticipant(Agent):
         if timestamp % ONE_DAY_IN_SECONDS == 0:
             self.compute_day_ahead_schedule(timestamp)
 
-        print(
-            f"Participant calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+        logging.info(
+            f"Participant {self.aid} calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
         )
 
     def compute_day_ahead_schedule(self, timestamp):
