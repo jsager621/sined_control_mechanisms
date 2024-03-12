@@ -2,7 +2,16 @@ from mango import Agent
 import random
 import pandapower as pp
 import pandapower.networks as ppnet
-from messages.message_classes import TimeStepMessage, TimeStepReply, AgentAddress
+import logging
+from messages.message_classes import (
+    TimeStepMessage,
+    TimeStepReply,
+    AgentAddress,
+    RegistrationMessage,
+    RegistrationReply,
+    LocalResidualScheduleMessage,
+)
+from util import time_int_to_str, read_grid_config
 
 # Pandapower Copyright (c) 2018 by University of Kassel and Fraunhofer IEE
 
@@ -14,10 +23,10 @@ class CentralInstance(Agent):
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
-        print(f"Hello world! My id is {self.aid}.")
+        self.grid_config = read_grid_config()
 
         # initialize grid for simulation
-        self.init_grid(grid_name="kerber_dorfnetz")
+        self.init_grid(grid_name=self.grid_config["GRID"])
 
         # initialize list to store result data for buses and lines
         self.result_timeseries_bus_vm_pu = {}
@@ -30,32 +39,32 @@ class CentralInstance(Agent):
             self.result_timeseries_line_load[self.grid.trafo.loc[i_trafo, "name"]] = []
 
         # store participants and their connection to the buses
-        self.num_participants = 57
-        # TODO! Connection of participants and buses (if not everyone partic.)
+        self.num_households = self.grid_config["NUM_HOUSEHOLDS"]
+        self.num_participants = self.grid_config["NUM_PARTICIPANTS"]
+        self.current_participants = 0
+
         self.loadbus_names = [
             self.grid.bus.loc[i_bus, "name"]
             for i_bus in range(len(self.grid.bus))
             if "loadbus" in self.grid.bus.loc[i_bus, "name"]
         ]
+
         if len(self.loadbus_names) < self.num_participants:
             raise ValueError(
                 f"{self.num_participants} for {len(self.loadbus_names)} load buses does not work!"
             )
+
         self.load_participant_coord = {}
-        idx_loads = list(range(len(self.loadbus_names)))
-        for i_part in range(self.num_participants):
-            rnd_num = random.randint(0, len(idx_loads) - 1)
-            self.load_participant_coord[str(i_part)] = idx_loads[rnd_num]
-            idx_loads.pop(rnd_num)
 
         # store type of current control form
-        self.control_type = "nothing"
+        self.control_type = self.grid_config["CONTROL_TYPE"]
 
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
         sender_id = meta.get("sender_id", None)
         sender_addr = meta.get("sender_addr", None)
         sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
 
         if isinstance(content, TimeStepMessage):
             c_id = content.c_id
@@ -63,13 +72,41 @@ class CentralInstance(Agent):
 
             # send reply
             content = TimeStepReply(c_id)
-            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
 
             self.schedule_instant_acl_message(
                 content,
                 (sender.host, sender.port),
                 sender.agent_id,
                 acl_metadata=acl_meta,
+            )
+
+        # no need to sync this because we run it synchronized from the simulation setup file
+        # if this was truly asynchronous we would have to safeguard it
+        if isinstance(content, RegistrationMessage):
+            if self.current_participants < self.num_participants:
+                self.add_participant(sender)
+                content = RegistrationReply(True)
+            else:
+                content = RegistrationReply(False)
+
+            self.schedule_instant_acl_message(
+                content,
+                (sender.host, sender.port),
+                sender.agent_id,
+                acl_metadata=acl_meta,
+            )
+
+        if isinstance(content, LocalResidualScheduleMessage):
+            logging.info(f"Got residual schedule message from agent: {sender}")
+            # TODO what needs to happen with this?
+
+    def add_participant(self, participant_address):
+        if self.current_participants < self.num_participants:
+            self.current_participants += 1
+            self.load_participant_coord[participant_address] = self.current_participants
+        else:
+            logging.warn(
+                "Trying to register too many participants. Excess participants will be ignored by the central instance."
             )
 
     def compute_time_step(self, timestamp):
@@ -121,7 +158,9 @@ class CentralInstance(Agent):
                 list_results_line[line_name]
             )
 
-        print(f"Central Instance calculated for timestamp {timestamp}.")
+        print(
+            f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+        )
 
     def init_grid(self, grid_name: str):
         if grid_name == "kerber_dorfnetz":

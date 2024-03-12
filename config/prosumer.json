@@ -14,8 +14,8 @@
         "hp": "heatpump.csv"
     },
     "COLUMNS": {
-        "load": "                P # [W]",
-        "pv": "                P # [W]",
+        "load": "P_IN_W",
+        "pv": "P_IN_W",
         "ev": {"state": "state", "consumption": "consumption"},
         "hp": "P_TOT"
     },

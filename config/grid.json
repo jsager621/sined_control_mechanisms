@@ -1,5 +1,6 @@
 {
     "GRID": "kerber_dorfnetz",
     "CONTROL_TYPE": "nothing",
-    "NUM_PARTICIPANTS": 57
+    "NUM_HOUSEHOLDS": 3,
+    "NUM_PARTICIPANTS": 3
 }

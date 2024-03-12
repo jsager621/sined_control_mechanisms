@@ -22,6 +22,9 @@ def get_codec():
     codec.add_serializer(*TimeStepMessage.__serializer__())
     codec.add_serializer(*TimeStepReply.__serializer__())
 
+    codec.add_serializer(*RegistrationMessage.__serializer__())
+    codec.add_serializer(*RegistrationReply.__serializer__())
+
     return codec
 
 
@@ -81,6 +84,12 @@ class ControlResidualMessage(BaseMessage):
     p_min: float = field(default=None)
 
 
+@json_serializable
+@dataclass
+class RegistrationReply:
+    ack: bool
+
+
 """
 Message from participants to central instance
 """
@@ -90,6 +99,12 @@ Message from participants to central instance
 @dataclass
 class LocalResidualScheduleMessage:
     residual_schedule: np.ndarray[float]
+
+
+@json_serializable
+@dataclass
+class RegistrationMessage:
+    pass
 
 
 """
