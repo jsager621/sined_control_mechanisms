@@ -132,7 +132,7 @@ class CentralInstance(Agent):
         while len(self.received_schedules[timestamp].keys()) < self.num_participants:
             await asyncio.sleep(0.01)
 
-    def check_schedule_ok(self, aggregate_schedule):
+    def check_schedule_ok(self, list_results_bus, list_results_line):
         return True
 
     async def calculate_aggregate_schedule(self, timestamp):
@@ -149,23 +149,56 @@ class CentralInstance(Agent):
         for addr, bus_id in self.load_participant_coord.items():
             bus_to_schedule[bus_id] = self.received_schedules[timestamp][addr]
 
-        # form: power_for_buses = {"loadbus_1_1": 2}
+        # initialize schedule results list
+        list_results_bus = {}
+        list_results_line = {}
+        for bus_name in self.result_timeseries_bus_vm_pu.keys():
+            list_results_bus[bus_name] = []
+        for line_name in self.result_timeseries_line_load.keys():
+            list_results_line[line_name] = []
 
-        aggregate_schedule = None
-        self.time_step_done = self.check_schedule_ok(aggregate_schedule)
+        for i in range(96):
+            # form: power_for_buses = {"loadbus_1_1": 2, ...}
+            bus_to_power = {}
+            for bus_name in bus_to_schedule.keys():
+                bus_to_power[bus_name] = bus_to_schedule[bus_name][i]
+
+            # set the inputs from the agents schedules
+            self.set_inputs(data_for_buses=bus_to_power)
+
+            # calculate the powerflow
+            self.calc_grid_powerflow()
+
+            # store the results of the powerflow
+            self.store_grid_results()
+
+            # set results into result saving lists
+            for bus_name in self.grid_results_bus.keys():
+                list_results_bus[bus_name].append(self.grid_results_bus[bus_name])
+            for line_name in self.grid_results_line.keys():
+                list_results_line[line_name].append(self.grid_results_line[line_name])
+
+        self.time_step_done = self.check_schedule_ok(
+            list_results_bus, list_results_line
+        )
+
+        # this was the last calculation for this time step
+        if self.time_step_done:
+            # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
+            for bus_name in self.result_timeseries_bus_vm_pu.keys():
+                self.result_timeseries_bus_vm_pu[bus_name].append(
+                    list_results_bus[bus_name]
+                )
+            for line_name in self.result_timeseries_line_load.keys():
+                self.result_timeseries_line_load[line_name].append(
+                    list_results_line[line_name]
+                )
 
     def clear_local_schedules(self, timestamp):
         if timestamp in self.received_schedules.keys():
             del self.received_schedules[timestamp]
 
     async def apply_control_mechanisms(self, timestamp):
-        pass
-
-    def dummy_mechanism(self, timestamp):
-        # just a "do nothing" control message
-        # can be removed later, just here to check the
-        # side of the logic responsible for sending these out and
-        # incorporating them!
         pass
 
     def send_time_step_done_to_syncing_agent(self, sender, c_id):
