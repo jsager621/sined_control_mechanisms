@@ -107,21 +107,20 @@ class NetParticipant(Agent):
         if timestamp % ONE_DAY_IN_SECONDS == 0:
             self.compute_day_ahead_schedule(timestamp)
 
-        # inform central instance about residual schedule
-        # TODO potentially wait out incoming messages that may change this for this time step?
-        content = LocalResidualScheduleMessage(timestamp, self.residual_schedule)
-        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+            # inform central instance about residual schedule
+            content = LocalResidualScheduleMessage(timestamp, self.residual_schedule)
+            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
 
-        self.schedule_instant_acl_message(
-            content,
-            (self.central_agent.host, self.central_agent.port),
-            self.central_agent.agent_id,
-            acl_metadata=acl_meta,
-        )
+            self.schedule_instant_acl_message(
+                content,
+                (self.central_agent.host, self.central_agent.port),
+                self.central_agent.agent_id,
+                acl_metadata=acl_meta,
+            )
 
-        logging.info(
-            f"Participant {self.aid} calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
-        )
+            logging.info(
+                f"Participant {self.aid} calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+            )
 
     def compute_day_ahead_schedule(self, timestamp):
         t_start = timestamp

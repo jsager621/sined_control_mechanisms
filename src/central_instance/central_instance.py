@@ -10,6 +10,7 @@ from messages.message_classes import (
     RegistrationMessage,
     RegistrationReply,
     LocalResidualScheduleMessage,
+    ControlMechanismMessage,
 )
 from util import time_int_to_str, read_grid_config
 
@@ -58,6 +59,7 @@ class CentralInstance(Agent):
 
         self.load_participant_coord = {}
         self.received_schedules = {}
+        self.time_step_done = False
 
         # store type of current control form
         self.control_type = self.grid_config["CONTROL_TYPE"]
@@ -118,10 +120,10 @@ class CentralInstance(Agent):
         while len(self.received_schedules[timestamp]) < self.num_participants:
             await asyncio.sleep(0.01)
 
-    async def compute_time_step(self, timestamp, sender, c_id):
-        # collect agents residual schedules
-        await self.get_participant_schedules(timestamp)
+    def check_schedule_ok(self, aggregate_schedule):
+        return True
 
+    async def calculate_aggregate_schedule(self, timestamp):
         # form: power_for_buses = {"loadbus_1_1": 2}
         # TODO: set me correctly
         power_for_buses = {
@@ -167,6 +169,24 @@ class CentralInstance(Agent):
                 list_results_line[line_name]
             )
 
+        aggregate_schedule = None
+        self.time_step_done = self.check_schedule_ok(aggregate_schedule)
+
+    def clear_local_schedules(self, timestamp):
+        if timestamp in self.received_schedules.keys():
+            del self.received_schedules[timestamp]
+
+    async def apply_control_mechanisms(self, timestamp):
+        pass
+
+    def dummy_mechanism(self, timestamp):
+        # just a "do nothing" control message
+        # can be removed later, just here to check the
+        # side of the logic responsible for sending these out and
+        # incorporating them!
+        pass
+
+    def send_time_step_done_to_syncing_agent(self, sender, c_id):
         # send reply
         content = TimeStepReply(c_id)
         acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
@@ -177,9 +197,33 @@ class CentralInstance(Agent):
             acl_metadata=acl_meta,
         )
 
-        print(
-            f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
-        )
+    async def compute_time_step(self, timestamp, sender, c_id):
+        # collect agents residual schedules
+        if timestamp % ONE_DAY_IN_SECONDS == 0:
+            self.time_step_done = False
+
+            # always happens at least once
+            await self.get_participant_schedules(timestamp)
+            await self.calculate_aggregate_schedule(timestamp)
+
+            # gets instantly skipped if schedules are already ok
+            # flag gets set by calculate_aggregate_schedule when the schedule
+            # fulfilly all requirements
+            while not self.time_step_done:
+                # NOTE: runs the risk of infinitely looping if control mechanisms
+                # do not converge on a viable solution!
+                # TODO: maybe consider max number of retries or ensure there is always
+                # a strong enough final mechanism to ensure compliance
+                self.clear_local_schedules(timestamp)
+                await self.apply_control_mechanisms(timestamp)
+                await self.get_participant_schedules(timestamp)
+                await self.calculate_aggregate_schedule(timestamp)
+
+            self.send_time_step_done_to_syncing_agent(sender, c_id)
+
+            logging.info(
+                f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+            )
 
     def init_grid(self, grid_name: str):
         if grid_name == "kerber_dorfnetz":
