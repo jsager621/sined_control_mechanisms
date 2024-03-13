@@ -13,7 +13,7 @@ When an agent has finished its computations it replies with a corresponding Time
 Once all agents have replied for this time step the next time step can be triggered.
 """
 
-TIME_INCREMENT = 15 * 60  # 15 minutes in seconds
+TIME_INCREMENT = 24 * 60 * 60  # 24 hours in seconds
 
 
 @dataclass
@@ -56,10 +56,10 @@ class SyncingAgent(Agent):
             raise ValueError("Start time after end time!")
 
         if start_time % TIME_INCREMENT != 0:
-            raise ValueError("Start time is not on 15 minute slot!")
+            raise ValueError("Start time is not on fitting time slot!")
 
         if end_time % TIME_INCREMENT != 0:
-            raise ValueError("End time is not on 15 minute slot!")
+            raise ValueError("End time is not on fitting time slot!")
 
         # run each time step from start to end time in 15 minute increments
         current_time_step = start_time

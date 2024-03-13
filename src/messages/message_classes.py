@@ -25,6 +25,8 @@ def get_codec():
     codec.add_serializer(*RegistrationMessage.__serializer__())
     codec.add_serializer(*RegistrationReply.__serializer__())
 
+    codec.add_serializer(*ControlMechanismMessage.__serializer__())
+
     return codec
 
 
@@ -90,6 +92,17 @@ class RegistrationReply:
     ack: bool
 
 
+# each field is an array of 96 values
+# one setpoint for each 15 minute interval in the day-ahead schedule
+@json_serializable
+@dataclass
+class ControlMechanismMessage:
+    timestamp: int
+    tariff: np.ndarray[float]
+    p_max: np.ndarray[float]
+    p_min: np.ndarray[float]
+
+
 """
 Message from participants to central instance
 """
@@ -98,6 +111,7 @@ Message from participants to central instance
 @json_serializable
 @dataclass
 class LocalResidualScheduleMessage:
+    timestamp: int
     residual_schedule: np.ndarray[float]
 
 

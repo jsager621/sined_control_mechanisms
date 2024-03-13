@@ -1,5 +1,5 @@
 from mango import Agent
-import random
+import asyncio
 import pandapower as pp
 import pandapower.networks as ppnet
 import logging
@@ -10,10 +10,13 @@ from messages.message_classes import (
     RegistrationMessage,
     RegistrationReply,
     LocalResidualScheduleMessage,
+    ControlMechanismMessage,
 )
 from util import time_int_to_str, read_grid_config
 
 # Pandapower Copyright (c) 2018 by University of Kassel and Fraunhofer IEE
+
+ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 
 class CentralInstance(Agent):
@@ -27,6 +30,7 @@ class CentralInstance(Agent):
 
         # initialize grid for simulation
         self.init_grid(grid_name=self.grid_config["GRID"])
+        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
         # initialize list to store result data for buses and lines
         self.result_timeseries_bus_vm_pu = {}
@@ -43,6 +47,16 @@ class CentralInstance(Agent):
         self.num_participants = self.grid_config["NUM_PARTICIPANTS"]
         self.current_participants = 0
 
+        if self.num_households > len(self.load_bus_names):
+            raise ValueError(
+                "Trying to create grid with more households than load buses!"
+            )
+
+        if self.num_participants > self.num_households:
+            raise ValueError(
+                "Trying to create grid with more participants than households!"
+            )
+
         self.loadbus_names = [
             self.grid.bus.loc[i_bus, "name"]
             for i_bus in range(len(self.grid.bus))
@@ -55,6 +69,8 @@ class CentralInstance(Agent):
             )
 
         self.load_participant_coord = {}
+        self.received_schedules = {}
+        self.time_step_done = False
 
         # store type of current control form
         self.control_type = self.grid_config["CONTROL_TYPE"]
@@ -67,17 +83,8 @@ class CentralInstance(Agent):
         acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
 
         if isinstance(content, TimeStepMessage):
-            c_id = content.c_id
-            self.compute_time_step(content.time)
-
-            # send reply
-            content = TimeStepReply(c_id)
-
-            self.schedule_instant_acl_message(
-                content,
-                (sender.host, sender.port),
-                sender.agent_id,
-                acl_metadata=acl_meta,
+            self.schedule_instant_task(
+                self.compute_time_step(content.time, sender, content.c_id)
             )
 
         # no need to sync this because we run it synchronized from the simulation setup file
@@ -98,29 +105,49 @@ class CentralInstance(Agent):
 
         if isinstance(content, LocalResidualScheduleMessage):
             logging.info(f"Got residual schedule message from agent: {sender}")
-            # TODO what needs to happen with this?
+
+            if content.timestamp not in self.received_schedules.keys():
+                self.received_schedules[content.timestamp] = {}
+
+            self.received_schedules[content.timestamp][
+                sender
+            ] = content.residual_schedule
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
             self.current_participants += 1
-            self.load_participant_coord[participant_address] = self.current_participants
+            self.load_participant_coord[participant_address] = self.load_bus_names[
+                self.current_participants
+            ]
         else:
             logging.warn(
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
             )
 
-    def compute_time_step(self, timestamp):
-        # collect agents residual schedules
-        # TODO!
-        # form: power_for_buses = {"loadbus_1_1": 2}
-        power_for_buses = {
-            self.grid.bus.loc[i_bus, "name"]: 1
-            for i_bus in range(len(self.grid.bus))
-            if "loadbus" in self.grid.bus.loc[i_bus, "name"]
-        }
+    async def get_participant_schedules(self, timestamp):
+        # TODO make this nicer with futures?
+        while timestamp not in self.received_schedules.keys():
+            await asyncio.sleep(0.01)
 
-        # TODO maybe have to wait and ensure all agents have sent info
-        # -> can be added with a corresponding await here as necessary
+        while len(self.received_schedules[timestamp].keys()) < self.num_participants:
+            await asyncio.sleep(0.01)
+
+    def check_schedule_ok(self, list_results_bus, list_results_line):
+        return True
+
+    async def calculate_aggregate_schedule(self, timestamp):
+        # NOTE:
+        # Assumes all relevant participant schedules are now present in:
+        # self.received_schedules[timestamp]
+        #
+        #
+        # self.load_participant_coord[participant_address] - maps participant address to bus number
+        # self.received_schedules[timestamp][participan_address] - contains the corresponding schedule
+        #
+        # for simplicity, parse these two things into one dict here:
+        bus_to_schedule = {}
+        for addr, bus_id in self.load_participant_coord.items():
+            bus_to_schedule[bus_id] = self.received_schedules[timestamp][addr]
 
         # initialize schedule results list
         list_results_bus = {}
@@ -130,10 +157,14 @@ class CentralInstance(Agent):
         for line_name in self.result_timeseries_line_load.keys():
             list_results_line[line_name] = []
 
-        # go by each time step (TODO! dynamically)
-        for step in range(96):
+        for i in range(96):
+            # form: power_for_buses = {"loadbus_1_1": 2, ...}
+            bus_to_power = {}
+            for bus_name in bus_to_schedule.keys():
+                bus_to_power[bus_name] = bus_to_schedule[bus_name][i]
+
             # set the inputs from the agents schedules
-            self.set_inputs(data_for_buses=power_for_buses)
+            self.set_inputs(data_for_buses=bus_to_power)
 
             # calculate the powerflow
             self.calc_grid_powerflow()
@@ -147,20 +178,67 @@ class CentralInstance(Agent):
             for line_name in self.grid_results_line.keys():
                 list_results_line[line_name].append(self.grid_results_line[line_name])
 
-        # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
-        # TODO!
-        for bus_name in self.result_timeseries_bus_vm_pu.keys():
-            self.result_timeseries_bus_vm_pu[bus_name].append(
-                list_results_bus[bus_name]
-            )
-        for line_name in self.result_timeseries_line_load.keys():
-            self.result_timeseries_line_load[line_name].append(
-                list_results_line[line_name]
-            )
-
-        print(
-            f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+        self.time_step_done = self.check_schedule_ok(
+            list_results_bus, list_results_line
         )
+
+        # this was the last calculation for this time step
+        if self.time_step_done:
+            # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
+            for bus_name in self.result_timeseries_bus_vm_pu.keys():
+                self.result_timeseries_bus_vm_pu[bus_name].append(
+                    list_results_bus[bus_name]
+                )
+            for line_name in self.result_timeseries_line_load.keys():
+                self.result_timeseries_line_load[line_name].append(
+                    list_results_line[line_name]
+                )
+
+    def clear_local_schedules(self, timestamp):
+        if timestamp in self.received_schedules.keys():
+            del self.received_schedules[timestamp]
+
+    async def apply_control_mechanisms(self, timestamp):
+        pass
+
+    def send_time_step_done_to_syncing_agent(self, sender, c_id):
+        # send reply
+        content = TimeStepReply(c_id)
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+        self.schedule_instant_acl_message(
+            content,
+            (sender.host, sender.port),
+            sender.agent_id,
+            acl_metadata=acl_meta,
+        )
+
+    async def compute_time_step(self, timestamp, sender, c_id):
+        # collect agents residual schedules
+        if timestamp % ONE_DAY_IN_SECONDS == 0:
+            self.time_step_done = False
+
+            # always happens at least once
+            await self.get_participant_schedules(timestamp)
+            await self.calculate_aggregate_schedule(timestamp)
+
+            # gets instantly skipped if schedules are already ok
+            # flag gets set by calculate_aggregate_schedule when the schedule
+            # fulfilly all requirements
+            while not self.time_step_done:
+                # NOTE: runs the risk of infinitely looping if control mechanisms
+                # do not converge on a viable solution!
+                # TODO: maybe consider max number of retries or ensure there is always
+                # a strong enough final mechanism to ensure compliance
+                self.clear_local_schedules(timestamp)
+                await self.apply_control_mechanisms(timestamp)
+                await self.get_participant_schedules(timestamp)
+                await self.calculate_aggregate_schedule(timestamp)
+
+            self.send_time_step_done_to_syncing_agent(sender, c_id)
+
+            logging.info(
+                f"Central Instance calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
+            )
 
     def init_grid(self, grid_name: str):
         if grid_name == "kerber_dorfnetz":
