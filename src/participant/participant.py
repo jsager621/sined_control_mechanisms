@@ -12,6 +12,7 @@ from messages.message_classes import (
     RegistrationMessage,
     RegistrationReply,
     LocalResidualScheduleMessage,
+    ControlMechanismMessage,
 )
 from util import (
     read_ev_data,
@@ -101,23 +102,36 @@ class NetParticipant(Agent):
 
             self.registration_future.set_result(True)
 
+        if isinstance(content, ControlMechanismMessage):
+            # update information locally
+            self.apply_control_message(content)
+
+            # recalculate schedule based on new information
+            self.compute_and_send_schedule(content.timestamp)
+
+    def apply_control_message(self, content):
+        # TODO set values from control content here
+        pass
+
+    def compute_and_send_schedule(self, timestamp):
+        self.compute_day_ahead_schedule(timestamp)
+
+        # inform central instance about residual schedule
+        content = LocalResidualScheduleMessage(timestamp, self.residual_schedule)
+        acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+
+        self.schedule_instant_acl_message(
+            content,
+            (self.central_agent.host, self.central_agent.port),
+            self.central_agent.agent_id,
+            acl_metadata=acl_meta,
+        )
+
     def compute_time_step(self, timestamp):
         # retrieve forecasts for this day (with given timestamp and stepsize)
         # check if this is 00:00:00 on some day
         if timestamp % ONE_DAY_IN_SECONDS == 0:
-            self.compute_day_ahead_schedule(timestamp)
-
-            # inform central instance about residual schedule
-            content = LocalResidualScheduleMessage(timestamp, self.residual_schedule)
-            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
-
-            self.schedule_instant_acl_message(
-                content,
-                (self.central_agent.host, self.central_agent.port),
-                self.central_agent.agent_id,
-                acl_metadata=acl_meta,
-            )
-
+            self.compute_and_send_schedule(timestamp)
             logging.info(
                 f"Participant {self.aid} calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
             )
