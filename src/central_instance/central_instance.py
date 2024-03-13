@@ -30,6 +30,7 @@ class CentralInstance(Agent):
 
         # initialize grid for simulation
         self.init_grid(grid_name=self.grid_config["GRID"])
+        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
         # initialize list to store result data for buses and lines
         self.result_timeseries_bus_vm_pu = {}
@@ -45,6 +46,16 @@ class CentralInstance(Agent):
         self.num_households = self.grid_config["NUM_HOUSEHOLDS"]
         self.num_participants = self.grid_config["NUM_PARTICIPANTS"]
         self.current_participants = 0
+
+        if self.num_households > len(self.load_bus_names):
+            raise ValueError(
+                "Trying to create grid with more households than load buses!"
+            )
+
+        if self.num_participants > self.num_households:
+            raise ValueError(
+                "Trying to create grid with more participants than households!"
+            )
 
         self.loadbus_names = [
             self.grid.bus.loc[i_bus, "name"]
@@ -95,18 +106,19 @@ class CentralInstance(Agent):
         if isinstance(content, LocalResidualScheduleMessage):
             logging.info(f"Got residual schedule message from agent: {sender}")
 
-            # TODO what needs to happen with this?
-            if content.timestamp in self.received_schedules.keys():
-                self.received_schedules[content.timestamp].append(
-                    content.residual_schedule
-                )
-            else:
-                self.received_schedules[content.timestamp] = [content.residual_schedule]
+            if content.timestamp not in self.received_schedules.keys():
+                self.received_schedules[content.timestamp] = {}
+
+            self.received_schedules[content.timestamp][
+                sender
+            ] = content.residual_schedule
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
             self.current_participants += 1
-            self.load_participant_coord[participant_address] = self.current_participants
+            self.load_participant_coord[participant_address] = self.load_bus_names[
+                self.current_participants
+            ]
         else:
             logging.warn(
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
@@ -117,57 +129,27 @@ class CentralInstance(Agent):
         while timestamp not in self.received_schedules.keys():
             await asyncio.sleep(0.01)
 
-        while len(self.received_schedules[timestamp]) < self.num_participants:
+        while len(self.received_schedules[timestamp].keys()) < self.num_participants:
             await asyncio.sleep(0.01)
 
     def check_schedule_ok(self, aggregate_schedule):
         return True
 
     async def calculate_aggregate_schedule(self, timestamp):
+        # NOTE:
+        # Assumes all relevant participant schedules are now present in:
+        # self.received_schedules[timestamp]
+        #
+        #
+        # self.load_participant_coord[participant_address] - maps participant address to bus number
+        # self.received_schedules[timestamp][participan_address] - contains the corresponding schedule
+        #
+        # for simplicity, parse these two things into one dict here:
+        bus_to_schedule = {}
+        for addr, bus_id in self.load_participant_coord.items():
+            bus_to_schedule[bus_id] = self.received_schedules[timestamp][addr]
+
         # form: power_for_buses = {"loadbus_1_1": 2}
-        # TODO: set me correctly
-        power_for_buses = {
-            self.grid.bus.loc[i_bus, "name"]: 1
-            for i_bus in range(len(self.grid.bus))
-            if "loadbus" in self.grid.bus.loc[i_bus, "name"]
-        }
-
-        # initialize schedule results list
-        list_results_bus = {}
-        list_results_line = {}
-        for bus_name in self.result_timeseries_bus_vm_pu.keys():
-            list_results_bus[bus_name] = []
-        for line_name in self.result_timeseries_line_load.keys():
-            list_results_line[line_name] = []
-
-        # go by each time step (TODO! dynamically)
-        # TODO 15 minute steps?
-        for step in range(96):
-            # set the inputs from the agents schedules
-            self.set_inputs(data_for_buses=power_for_buses)
-
-            # calculate the powerflow
-            self.calc_grid_powerflow()
-
-            # store the results of the powerflow
-            self.store_grid_results()
-
-            # set results into result saving lists
-            for bus_name in self.grid_results_bus.keys():
-                list_results_bus[bus_name].append(self.grid_results_bus[bus_name])
-            for line_name in self.grid_results_line.keys():
-                list_results_line[line_name].append(self.grid_results_line[line_name])
-
-        # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
-        # TODO!
-        for bus_name in self.result_timeseries_bus_vm_pu.keys():
-            self.result_timeseries_bus_vm_pu[bus_name].append(
-                list_results_bus[bus_name]
-            )
-        for line_name in self.result_timeseries_line_load.keys():
-            self.result_timeseries_line_load[line_name].append(
-                list_results_line[line_name]
-            )
 
         aggregate_schedule = None
         self.time_step_done = self.check_schedule_ok(aggregate_schedule)
