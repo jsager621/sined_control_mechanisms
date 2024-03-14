@@ -1,6 +1,13 @@
 {
     "GRID": "kerber_dorfnetz",
-    "CONTROL_TYPE": "nothing",
-    "NUM_HOUSEHOLDS": 3,
-    "NUM_PARTICIPANTS": 3
+    "CONTROL_TYPE": "limits",
+    "CONFIG_CONTROL": {
+        "P_MAX_INIT": 4500,
+        "P_MAX_STEP": -500,
+        "P_MIN_INIT": -4500,
+        "P_MIN_STEP": 500,
+        "TARIFF_ADJ_STEP": 0.01
+    },
+    "NUM_HOUSEHOLDS": 7,
+    "NUM_PARTICIPANTS": 7
 }
