@@ -90,16 +90,6 @@ def read_heatpump_data(t_start, t_end):
     return (rows[:, 1].astype("f"), rows[:, 2].astype("f"))
 
 
-def read_household_data(t_start, t_end):
-    reader = DataReader()
-    np_data = reader.household_data
-    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
-    rows = np_data[mask]
-
-    # return P_IN_W
-    return rows[:, 1].astype("f")
-
-
 def read_pv_data(t_start, t_end):
     reader = DataReader()
     np_data = reader.pv_data
@@ -111,12 +101,8 @@ def read_pv_data(t_start, t_end):
 
 
 def read_load_data(t_start, t_end):
-    # TODO add this
-    # return dummy data for now
-    return 0.5 * np.ones(96)
-
     reader = DataReader()
-    np_data = reader.load_data
+    np_data = reader.household_data
     mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
     rows = np_data[mask]
 

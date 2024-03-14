@@ -17,7 +17,6 @@ from messages.message_classes import (
 from util import (
     read_ev_data,
     read_pv_data,
-    read_household_data,
     read_heatpump_data,
     read_load_data,
     read_prosumer_config,
@@ -58,6 +57,9 @@ class NetParticipant(Agent):
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
         # NOTE positive values are power demand, negative values are generation
 
+        # initialize empty control signal from central instance
+        self.control_signal: ControlMechanismMessage = ControlMechanismMessage()
+
     async def register_to_central_agent(self, central_address):
         # send message
         content = RegistrationMessage()
@@ -81,7 +83,7 @@ class NetParticipant(Agent):
         sender_addr = meta.get("sender_addr", None)
         sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
-        if isinstance(content, TimeStepMessage):
+        if isinstance(content, TimeStepMessage):  # TODO add control signal class
             c_id = content.c_id
             self.compute_time_step(content.time)
 
@@ -109,11 +111,12 @@ class NetParticipant(Agent):
             # recalculate schedule based on new information
             self.compute_and_send_schedule(content.timestamp)
 
-    def apply_control_message(self, content):
-        # TODO set values from control content here
-        pass
+    def apply_control_message(self, content: ControlMechanismMessage):
+        """Simply save a control signal that is sent."""
+        self.control_signal = content
 
     def compute_and_send_schedule(self, timestamp):
+        """Compute day-ahead schedule and send it via a message."""
         self.compute_day_ahead_schedule(timestamp)
 
         # inform central instance about residual schedule
@@ -131,25 +134,40 @@ class NetParticipant(Agent):
         # retrieve forecasts for this day (with given timestamp and stepsize)
         # check if this is 00:00:00 on some day
         if timestamp % ONE_DAY_IN_SECONDS == 0:
+            # remove any given control signal
+            self.control_signal = None
+
             self.compute_and_send_schedule(timestamp)
             logging.info(
                 f"Participant {self.aid} calculated for timestamp {timestamp} --- {time_int_to_str(timestamp)}."
             )
 
-    def compute_day_ahead_schedule(self, timestamp):
+    def read_forecast_data(self, timestamp) -> dict:
         t_start = timestamp
         t_end = timestamp + ONE_DAY_IN_SECONDS
 
         forecasts = {}
-        forecasts["ev"] = {}
-
-        forecasts["load"] = read_load_data(t_start, t_end)
-        forecasts["pv"] = read_pv_data(t_start, t_end)
-        forecasts["ev"]["state"], forecasts["ev"]["consumption"] = read_ev_data(
-            t_start, t_end
+        forecasts["load"] = (
+            read_load_data(t_start, t_end)
+            * self.config["HOUSEHOLD"]["baseload_kWh_year"]
+            / 4085
         )
-        # only care about P_TOT here
-        forecasts["hp"] = read_heatpump_data(t_start, t_end)[0]
+        forecasts["pv"] = (
+            read_pv_data(t_start, t_end) * self.dev["pv"]["power_kWp"] / 10
+        )
+        ev_state, ev_consumption = read_ev_data(t_start, t_end)
+        ev_consumption = ev_consumption * self.dev["ev"]["capacity_kWh"] / 60
+        forecasts["ev"] = {"state": ev_state, "consumption": ev_consumption}
+        forecasts["hp"] = (
+            read_heatpump_data(t_start, t_end)[0]
+            * self.config["HOUSEHOLD"]["heatpump_kWh_el_year"]
+            / 7042
+        )
+
+        return forecasts
+
+    def compute_day_ahead_schedule(self, timestamp):
+        forecasts = self.read_forecast_data(timestamp=timestamp)
 
         # compute schedule for upcoming day
         schedule = calc_opt_day(
@@ -160,13 +178,15 @@ class NetParticipant(Agent):
             ev_vals=self.dev["ev"],
             elec_price=self.tariff["electricity_price"],
             feedin_tariff=self.tariff["feedin_tariff"],
+            step_size_s=self.step_size_s,
+            control_signal=self.control_signal,
         )
 
         # retrieve residual schedule
         self.residual_schedule = schedule["p_res"]
 
-        # retrieve energy level of BSS and EV at last time step (schedule["ev_e"] &
-        # schedule["bss_e"]) JUST FOR LAST SCHEDULE CALCULATION
+        # retrieve energy level of BSS and EV at last time step (schedule["ev_e"][-1] &
+        # schedule["bss_e"][-1]) JUST FOR LAST SCHEDULE CALCULATION
         # TODO!
 
         # update result_timeseries_residual at last calculation of this timestamp
@@ -190,6 +210,7 @@ def calc_opt_day(
     elec_price=0.35,
     feedin_tariff=0.07,
     step_size_s: int = 900,
+    control_signal: ControlMechanismMessage = ControlMechanismMessage(),
 ) -> dict:
     """Calculate the optimal schedule for the household based on profiles and parameters.
 
@@ -204,6 +225,7 @@ def calc_opt_day(
         feedin_tariff (list, float): Single value or list of values for grid feedin price.
             Defaults to 0.07.
         step_size_s (int): Size of a simulation step in seconds. Defaults to 900 (=15 min).
+        control_signal (ControlMechanismMessage): message with control signal from central instance
 
     Returns:
         dict: schedules for the devices of the houeshold
@@ -327,8 +349,6 @@ def calc_opt_day(
         == ev_vals["capacity_kWh"]
     )
 
-    # add constraints: hp
-
     # add constraints: bss - time coupling
     model.C_bss_start = pyo.Constraint(expr=model.x_bss_e[0] == bss_vals["e_kWh"])
     model.C_bss_coupl = pyo.ConstraintList()
@@ -364,8 +384,8 @@ def calc_opt_day(
         profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
             model.x_grid_feedin[:](), 1
         )
-        if model.x_ev_pen[0]() > 0:
-            print(f"Penalty variable for EV > 0: {np.round(model.x_ev_pen[0](), 1)}")
+        # if model.x_ev_pen[0]() > 0:
+        #     logging.info(f"Penalty var for EV > 0: {np.round(model.x_ev_pen[0](), 1)}")
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message

@@ -1,10 +1,10 @@
 {
     "HOUSEHOLD": {
-        "load_kWh": 5000,
-        "heat_kWh": 20000,
+        "baseload_kWh_year": 4085,
+        "heatpump_kWh_el_year": 7042,
         "pv": {"power_kWp": 10},
         "bss": {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5},
-        "ev": {"capacity_kWh": 45, "e_kWh": 45},
+        "ev": {"capacity_kWh": 60, "e_kWh": 60},
         "cs": {"power_kW": 11, "efficiency": 0.95}
     },
     "PATHS": {
