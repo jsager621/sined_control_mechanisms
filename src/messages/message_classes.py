@@ -13,10 +13,6 @@ from mango.messages.codecs import JSON
 def get_codec():
     codec = JSON()
 
-    codec.add_serializer(*NewElecPriceMessage.__serializer__())
-    codec.add_serializer(*NewFeedinTariffMessage.__serializer__())
-    codec.add_serializer(*ControlResidualMessage.__serializer__())
-
     codec.add_serializer(*LocalResidualScheduleMessage.__serializer__())
 
     codec.add_serializer(*TimeStepMessage.__serializer__())
@@ -52,38 +48,8 @@ class AgentAddress:
 
 
 """
-Base Message to include timestep for the sent signal to indicate for which time step it is meant
-"""
-
-
-@json_serializable
-@dataclass
-class BaseMessage:
-    timestep: int
-
-
-"""
 Message from central instance to participants
 """
-
-
-@json_serializable
-@dataclass
-class NewElecPriceMessage(BaseMessage):
-    price: float = field(default=None)
-
-
-@json_serializable
-@dataclass
-class NewFeedinTariffMessage(BaseMessage):
-    tariff: float = field(default=None)
-
-
-@json_serializable
-@dataclass
-class ControlResidualMessage(BaseMessage):
-    p_max: float = field(default=None)
-    p_min: float = field(default=None)
 
 
 @json_serializable
@@ -97,10 +63,10 @@ class RegistrationReply:
 @json_serializable
 @dataclass
 class ControlMechanismMessage:
-    timestamp: int
-    tariff: np.ndarray[float]
-    p_max: np.ndarray[float]
-    p_min: np.ndarray[float]
+    timestamp: int = field(default=None)
+    tariff: np.ndarray[float] = field(default=None)
+    p_max: np.ndarray[float] = field(default=None)
+    p_min: np.ndarray[float] = field(default=None)
 
 
 """
