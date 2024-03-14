@@ -38,8 +38,6 @@ class CentralInstance(Agent):
 
         # initialize grid for simulation
         self.init_grid(grid_name=self.grid_config["GRID"])
-        # store IDs of loadbuses
-        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
         # initialize list to store result data for buses and lines
         self.result_timeseries_bus_vm_pu = {}
@@ -157,6 +155,11 @@ class CentralInstance(Agent):
                         {"step": step, "comp_id": line_id, "val": value}
                     )
                     status_no_congestion = False
+
+        logging.info(
+            f"Central Instance - {len(self.congestions)} congestions detected."
+        )
+
         return status_no_congestion
 
     async def calculate_grid_schedule(self, timestamp):
@@ -273,26 +276,35 @@ class CentralInstance(Agent):
             )
 
     def init_grid(self, grid_name: str):
+        # load grid from pandapower
         if grid_name == "kerber_dorfnetz":
             self.grid = ppnet.create_kerber_dorfnetz()
         elif grid_name == "kerber_landnetz":
             self.grid = ppnet.create_kerber_landnetz_kabel_1()
         else:
-            print(f"Grid {self.aid} could not be created.")
-            self.grid = None
+            raise ValueError(
+                f"Grid {self.aid} could not be created - found no grid named {grid_name}"
+            )
+
+        # set all load (re)active power values to 0
+        for idx_l in range(len(self.grid.load)):
+            self.grid.load.at[idx_l, "p_mw"] = 0
+            self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
+
+        # store IDs of loadbuses
+        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
     def set_inputs(self, data_for_buses):
         """Set active/reactive power values for the grid loads."""
         for name_bus, power_value in data_for_buses.items():
             # get the index of the bus
             idx_b = self.grid.bus.index[self.grid.bus["name"] == name_bus].to_list()[0]
-            # get the index of the load and the load element
+            # get the index of the load
             idx_l = self.grid.load.index[self.grid.load["bus"] == idx_b].to_list()[0]
-            element = self.grid.load.loc[idx_l]
 
             # set active power (and remove reactive power value)
-            element.at["p_mw"] = power_value / 1000  # active power in MW
-            element.at["q_mvar"] = 0  # reactive power value
+            self.grid.load.at[idx_l, "p_mw"] = power_value / 1e6  # active power in MW
+            self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
 
     def calc_grid_powerflow(self):
         pp.runpp(
