@@ -6,7 +6,9 @@
         "P_MAX_STEP": -500,
         "P_MIN_INIT": -4500,
         "P_MIN_STEP": 500,
-        "TARIFF_ADJ_STEP": 0.01
+        "TARIFF_ADJ": 0.03,
+        "PEAK_PRICE_DEM": 0.02,
+        "PEAK_PRICE_GEN": 0.02
     },
     "NUM_HOUSEHOLDS": 7,
     "NUM_PARTICIPANTS": 7

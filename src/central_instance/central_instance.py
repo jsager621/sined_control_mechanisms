@@ -284,9 +284,9 @@ class CentralInstance(Agent):
         if self.control_type == "tariff":
             # adjust tariff
             for step in steps_curtail_demand:
-                self.control_signal.tariff[step] += self.control_conf["TARIFF_ADJ_STEP"]
+                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
             for step in steps_curtail_generation:
-                self.control_signal.tariff[step] -= self.control_conf["TARIFF_ADJ_STEP"]
+                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
         elif self.control_type == "limits":
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
@@ -299,9 +299,14 @@ class CentralInstance(Agent):
                     self.control_signal.p_min[step] + self.control_conf["P_MIN_STEP"],
                     self.control_conf["P_MIN_INIT"],
                 )
+        elif self.control_type == "peak_price":
+            # set peak price for both directions
+            self.control_signal.peak_price_dem = self.control_conf["PEAK_PRICE_DEM"]
+            self.control_signal.peak_price_gen = self.control_conf["PEAK_PRICE_GEN"]
         else:
             raise TypeError(
                 f"No control type '{self.control_type}' implemented for Central Instance!"
+                "Only 'tariff', 'limits', and 'peak_price' possible for CONTROL_TYPE!"
             )
 
         # send signals to each participant
@@ -338,7 +343,7 @@ class CentralInstance(Agent):
 
         self.control_signal = ControlMechanismMessage(
             timestamp=timestamp,
-            tariff=tariff_signal,
+            tariff_adj=tariff_signal,
             p_max=p_max_signal,
             p_min=p_min_signal,
         )
