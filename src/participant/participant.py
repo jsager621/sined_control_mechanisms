@@ -1,5 +1,7 @@
 from mango.agent.core import Agent
 import pyomo.environ as pyo
+from pyomo.environ import NonNegativeReals as NNReals
+from pyomo.environ import Var
 import numpy as np
 import pandas as pd
 import asyncio
@@ -83,7 +85,7 @@ class NetParticipant(Agent):
         sender_addr = meta.get("sender_addr", None)
         sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
-        if isinstance(content, TimeStepMessage):  # TODO add control signal class
+        if isinstance(content, TimeStepMessage):
             c_id = content.c_id
             self.compute_time_step(content.time)
 
@@ -105,6 +107,8 @@ class NetParticipant(Agent):
             self.registration_future.set_result(True)
 
         if isinstance(content, ControlMechanismMessage):
+            logging.info(f"Got control message from agent: {sender}")
+
             # update information locally
             self.apply_control_message(content)
 
@@ -134,8 +138,8 @@ class NetParticipant(Agent):
         # retrieve forecasts for this day (with given timestamp and stepsize)
         # check if this is 00:00:00 on some day
         if timestamp % ONE_DAY_IN_SECONDS == 0:
-            # remove any given control signal
-            self.control_signal = None
+            # remove any given control signal (first calculation for this day)
+            self.control_signal = ControlMechanismMessage()
 
             self.compute_and_send_schedule(timestamp)
             logging.info(
@@ -179,7 +183,7 @@ class NetParticipant(Agent):
             elec_price=self.tariff["electricity_price"],
             feedin_tariff=self.tariff["feedin_tariff"],
             step_size_s=self.step_size_s,
-            control_signal=self.control_signal,
+            control_sig=self.control_signal,
         )
 
         # retrieve residual schedule
@@ -210,7 +214,7 @@ def calc_opt_day(
     elec_price=0.35,
     feedin_tariff=0.07,
     step_size_s: int = 900,
-    control_signal: ControlMechanismMessage = ControlMechanismMessage(),
+    control_sig: ControlMechanismMessage = ControlMechanismMessage(),
 ) -> dict:
     """Calculate the optimal schedule for the household based on profiles and parameters.
 
@@ -225,7 +229,7 @@ def calc_opt_day(
         feedin_tariff (list, float): Single value or list of values for grid feedin price.
             Defaults to 0.07.
         step_size_s (int): Size of a simulation step in seconds. Defaults to 900 (=15 min).
-        control_signal (ControlMechanismMessage): message with control signal from central instance
+        control_sig (ControlMechanismMessage): message with control signal from central instance
 
     Returns:
         dict: schedules for the devices of the houeshold
@@ -233,44 +237,41 @@ def calc_opt_day(
     # create parameters
     GRANULARITY = step_size_s / 3600
     DAY_STEPS = range(int(24 / GRANULARITY))
-    DAY_STEPS_PLUS_1 = range(int(24 / GRANULARITY + 1))
+    DAY_STEPS_P1 = range(int(24 / GRANULARITY + 1))
 
     # initialize model
     model = pyo.ConcreteModel()
 
     # add optimization variables
-    model.x_grid_load = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
-    model.x_grid_feedin = pyo.Var(DAY_STEPS, domain=pyo.NonNegativeReals)
-    model.x_p_peak = pyo.Var(range(1), domain=pyo.NonNegativeReals)
-    model.x_p_valley = pyo.Var(range(1), domain=pyo.NonNegativeReals)
-    model.x_pv_p = pyo.Var(
-        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, pv_vals["power_kWp"])
+    model.x_grid_load = Var(DAY_STEPS, domain=NNReals)
+    model.x_grid_feedin = Var(DAY_STEPS, domain=NNReals)
+    model.x_p_peak_load = Var(range(1), domain=NNReals)
+    model.x_p_peak_gen = Var(range(1), domain=NNReals)
+    model.x_pv_p = Var(DAY_STEPS, domain=NNReals, bounds=(0, pv_vals["power_kWp"]))
+    model.x_bss_p_cha = Var(DAY_STEPS, domain=NNReals, bounds=(0, bss_vals["power_kW"]))
+    model.x_bss_p_disch = Var(
+        DAY_STEPS, domain=NNReals, bounds=(0, bss_vals["power_kW"])
     )
-    model.x_bss_p_charge = pyo.Var(
-        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, bss_vals["power_kW"])
-    )
-    model.x_bss_p_discharge = pyo.Var(
-        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, bss_vals["power_kW"])
-    )
-    model.x_bss_e = pyo.Var(
-        DAY_STEPS_PLUS_1,
-        domain=pyo.NonNegativeReals,
+    model.x_bss_e = Var(
+        DAY_STEPS_P1,
+        domain=NNReals,
         bounds=(0, bss_vals["capacity_kWh"]),
     )
-    model.x_cs_p_charge = pyo.Var(
-        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, cs_vals["power_kW"])
+    model.x_cs_p_charge = Var(
+        DAY_STEPS, domain=NNReals, bounds=(0, cs_vals["power_kW"])
     )
-    model.x_cs_p_discharge = pyo.Var(
-        DAY_STEPS, domain=pyo.NonNegativeReals, bounds=(0, cs_vals["power_kW"])
+    model.x_cs_p_discharge = Var(
+        DAY_STEPS, domain=NNReals, bounds=(0, cs_vals["power_kW"])
     )
-    model.x_ev_e = pyo.Var(
-        DAY_STEPS_PLUS_1,
-        domain=pyo.NonNegativeReals,
+    model.x_ev_e = Var(
+        DAY_STEPS_P1,
+        domain=NNReals,
         bounds=(0, ev_vals["capacity_kWh"]),
     )
-    model.x_ev_pen = pyo.Var(
-        range(1), domain=pyo.NonNegativeReals, bounds=(0, ev_vals["capacity_kWh"])
-    )
+    model.x_ev_pen = Var(range(1), domain=NNReals, bounds=(0, ev_vals["capacity_kWh"]))
+    # variables for control signals regarding residual power
+    model.control_pen_max = Var(DAY_STEPS, domain=NNReals)
+    model.control_pen_min = Var(DAY_STEPS, domain=NNReals)
 
     # add objective function
     if isinstance(elec_price, float):
@@ -281,12 +282,27 @@ def calc_opt_day(
     ev_dir_cha = sum((t / 1e6 * model.x_cs_p_charge[t]) for t in range(len(DAY_STEPS)))
     c_bss_energy = (feedin_tariff[-1] + elec_price[-1]) / 2
     bss_incent = (
-        -c_bss_energy * model.x_bss_e[DAY_STEPS_PLUS_1[-1]]
+        -c_bss_energy * model.x_bss_e[DAY_STEPS_P1[-1]] * GRANULARITY
     )  # incentive bss energy at the end to not randomly feed into grid but store for next day
-    c_peak = 0.01  # peak price needs to be positive, height ist irrelevant
-    c_valley = (
-        min(c_bss_energy, np.mean(elec_price)) * GRANULARITY / 2
-    )  # to reduce valley instead of keeping energy and to not use grid energy to reduce valley
+    # set peak prices in both directions for power peaks
+    if control_sig is not None and control_sig.peak_price_dem is not None:
+        c_peak_dem = control_sig.peak_price_dem
+    else:
+        c_peak_dem = 0.0
+    if control_sig is not None and control_sig.peak_price_gen is not None:
+        c_peak_gen = control_sig.peak_price_gen
+    else:
+        c_peak_gen = 0.0
+    # penalize non-compliance with control signals
+    obj_signals = (
+        sum(  # simply add penalty costs to objective function if limits are surpassed
+            100 * (model.control_pen_max[idx] + model.control_pen_min[idx])
+            for idx in DAY_STEPS
+        )
+    )
+    # adjust electricity price list with sent control signals
+    if control_sig is not None and isinstance(control_sig.tariff_adj, np.ndarray):
+        elec_price = list(elec_price + control_sig.tariff_adj)
     model.OBJ = pyo.Objective(
         expr=sum(
             [
@@ -295,11 +311,12 @@ def calc_opt_day(
                 for t in DAY_STEPS
             ]
         )
+        + obj_signals
         + ev_penalty
         + bss_incent
         + ev_dir_cha
-        + c_peak * model.x_p_peak[0]
-        + c_valley * model.x_p_valley[0]
+        + c_peak_dem * model.x_p_peak_load[0]
+        + c_peak_gen * model.x_p_peak_gen[0]
     )
 
     # add constraints: balance
@@ -310,17 +327,33 @@ def calc_opt_day(
             + forecasts["hp"][t]
             + model.x_cs_p_charge[t]
             + model.x_grid_feedin[t]
-            + model.x_bss_p_charge[t]
-            == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_discharge[t]
+            + model.x_bss_p_cha[t]
+            == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_disch[t]
         )
+
+    # constraints for control signals: go by each separate signal and apply it via constraints
+    if control_sig is not None:
+        model.C_control = pyo.ConstraintList()
+        for step in DAY_STEPS:
+            # add constraint for max. and min. power demand at this step, add penalty variable
+            if control_sig.p_max is not None and control_sig.p_max[step] != np.inf:
+                model.C_control.add(
+                    expr=model.x_grid_load[step] - model.x_grid_feedin[step]
+                    <= control_sig.p_max[step] + model.control_pen_max[step]
+                )
+            if control_sig.p_min is not None and control_sig.p_min[step] != -np.inf:
+                model.C_control.add(
+                    expr=model.x_grid_load[step] - model.x_grid_feedin[step]
+                    >= control_sig.p_min[step] - model.control_pen_min[step]
+                )
 
     # add constraints: peak and valley
     model.C_peak = pyo.ConstraintList()
     for t in DAY_STEPS:
-        model.C_peak.add(expr=model.x_p_peak[0] >= model.x_grid_load[t])
+        model.C_peak.add(expr=model.x_p_peak_load[0] >= model.x_grid_load[t])
     model.C_val = pyo.ConstraintList()
     for t in DAY_STEPS:
-        model.C_val.add(expr=model.x_p_valley[0] >= model.x_grid_feedin[t])
+        model.C_val.add(expr=model.x_p_peak_gen[0] >= model.x_grid_feedin[t])
 
     # add constraints: pv - max generation
     model.C_pv_power = pyo.ConstraintList()
@@ -345,7 +378,7 @@ def calc_opt_day(
             model.C_ev_home.add(expr=model.x_cs_p_charge[t] == 0)
             model.C_ev_home.add(expr=model.x_cs_p_discharge[t] == 0)
     model.C_ev_end = pyo.Constraint(
-        expr=model.x_ev_e[DAY_STEPS_PLUS_1[-1]] + model.x_ev_pen[0]
+        expr=model.x_ev_e[DAY_STEPS_P1[-1]] + model.x_ev_pen[0]
         == ev_vals["capacity_kWh"]
     )
 
@@ -354,8 +387,8 @@ def calc_opt_day(
     model.C_bss_coupl = pyo.ConstraintList()
     for t in DAY_STEPS:
         e_adapt = (
-            model.x_bss_p_charge[t] * bss_vals["efficiency"]
-            - model.x_bss_p_discharge[t] / bss_vals["efficiency"]
+            model.x_bss_p_cha[t] * bss_vals["efficiency"]
+            - model.x_bss_p_disch[t] / bss_vals["efficiency"]
         ) * GRANULARITY
         model.C_bss_coupl.add(expr=model.x_bss_e[t + 1] == model.x_bss_e[t] + e_adapt)
 
@@ -377,8 +410,8 @@ def calc_opt_day(
         )
         profiles["ev_e"] = np.round(model.x_ev_e[:](), 1)
         profiles["hp"] = forecasts["hp"]
-        profiles["bss"] = np.round(model.x_bss_p_charge[:](), 1) - np.round(
-            model.x_bss_p_discharge[:](), 1
+        profiles["bss"] = np.round(model.x_bss_p_cha[:](), 1) - np.round(
+            model.x_bss_p_disch[:](), 1
         )
         profiles["bss_e"] = np.round(model.x_bss_e[:](), 1)
         profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
