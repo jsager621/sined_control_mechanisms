@@ -5,19 +5,7 @@
         "pv": {"power_kWp": 10},
         "bss": {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5},
         "ev": {"capacity_kWh": 60, "e_kWh": 60},
-        "cs": {"power_kW": 11, "efficiency": 0.95}
-    },
-    "PATHS": {
-        "load": "household_load.csv",
-        "pv": "pv_10kw.csv",
-        "ev": "ev_45kWh.csv",
-        "hp": "heatpump.csv"
-    },
-    "COLUMNS": {
-        "load": "P_IN_W",
-        "pv": "P_IN_W",
-        "ev": {"state": "state", "consumption": "consumption"},
-        "hp": "P_TOT"
+        "cs": {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0}
     },
     "TARIFF": {
         "electricity_price": 0.35,
