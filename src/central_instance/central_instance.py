@@ -24,10 +24,7 @@ class CentralInstance(Agent):
     # initialize grid component limits for buses and lines
     BUS_LV_VM_MIN = 0.9
     BUS_LV_VM_MAX = 1.1
-    LINE_LV_LOAD_MAX = 20
-
-    # Maximum number of loops to send (adjusted signal before quitting)
-    MAX_NUM_LOOPS = 2
+    LINE_LV_LOAD_MAX = 24
 
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
@@ -219,6 +216,8 @@ class CentralInstance(Agent):
         for addr, bus_id in self.load_participant_coord.items():
             bus_to_schedule[bus_id] = self.received_schedules[timestamp][addr]
 
+        # print(bus_to_schedule["loadbus_1_2"])
+
         # initialize schedule results list
         list_results_bus = {}
         list_results_line = {}
@@ -279,6 +278,9 @@ class CentralInstance(Agent):
                 steps_curtail_generation.append(cong_dict["step"])
             elif cong_dict["curtail"] == "dem":
                 steps_curtail_demand.append(cong_dict["step"])
+        # take unique values and sort them
+        steps_curtail_demand = sorted(set(steps_curtail_demand))
+        steps_curtail_generation = sorted(set(steps_curtail_generation))
 
         # create signal with regard to control strategy
         if self.control_type == "tariff":
@@ -291,13 +293,15 @@ class CentralInstance(Agent):
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
                 self.control_signal.p_max[step] = min(
-                    self.control_signal.p_max[step] + self.control_conf["P_MAX_STEP"],
-                    self.control_conf["P_MAX_INIT"],
+                    self.control_signal.p_max[step]
+                    + self.control_conf["P_MAX_STEP_kW"],
+                    self.control_conf["P_MAX_INIT_kW"],
                 )
             for step in steps_curtail_generation:
                 self.control_signal.p_min[step] = min(
-                    self.control_signal.p_min[step] + self.control_conf["P_MIN_STEP"],
-                    self.control_conf["P_MIN_INIT"],
+                    self.control_signal.p_min[step]
+                    + self.control_conf["P_MIN_STEP_kW"],
+                    self.control_conf["P_MIN_INIT_kW"],
                 )
         elif self.control_type == "peak_price":
             # set peak price for both directions
@@ -363,18 +367,18 @@ class CentralInstance(Agent):
             # fulfilly all requirements
             step_loops = 0
             while not self.time_step_done:
-                # NOTE: runs the risk of infinitely looping if control mechanisms
-                # do not converge on a viable solution!
-                # TODO: maybe consider max number of retries or ensure there is always
-                # a strong enough final mechanism to ensure compliance
+                # check if looping of sending control signals exceeded max.
+                if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
+                    raise RuntimeError(
+                        f"Too many loops (# = {step_loops}) for control signals!"
+                    )
+
+                # TODO: maybe ensure mechanism is always a strong enough for compliance? (probably not possible)
                 self.clear_local_schedules(timestamp)
                 await self.apply_control_mechanisms(timestamp)
                 await self.get_participant_schedules(timestamp)
                 await self.calculate_grid_schedule(timestamp)
                 step_loops += 1
-
-                if step_loops >= self.MAX_NUM_LOOPS:
-                    raise RuntimeError("Too many loops for control signals!")
 
             self.send_time_step_done_to_syncing_agent(sender, c_id)
 
@@ -410,7 +414,7 @@ class CentralInstance(Agent):
             idx_l = self.grid.load.index[self.grid.load["bus"] == idx_b].to_list()[0]
 
             # set active power (and remove reactive power value)
-            self.grid.load.at[idx_l, "p_mw"] = power_value / 1e6  # active power in MW
+            self.grid.load.at[idx_l, "p_mw"] = power_value / 1e3  # active power kW->MW
             self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
 
     def calc_grid_powerflow(self):
