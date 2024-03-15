@@ -336,16 +336,14 @@ class CentralInstance(Agent):
         )
 
     def reset_control_signal(self, timestamp: int):
-        # initialize "zero" signals
-        tariff_signal = np.zeros(self.steps_day)
-        p_max_signal = np.inf * np.ones(self.steps_day)
-        p_min_signal = -np.inf * np.ones(self.steps_day)
-
+        """Initialize "zero" signals for control."""
         self.control_signal = ControlMechanismMessage(
             timestamp=timestamp,
-            tariff_adj=tariff_signal,
-            p_max=p_max_signal,
-            p_min=p_min_signal,
+            tariff_adj=np.zeros(self.steps_day),
+            p_max=np.inf * np.ones(self.steps_day),
+            p_min=-np.inf * np.ones(self.steps_day),
+            peak_price_gen=0.0,
+            peak_price_dem=0.0,
         )
 
     async def compute_time_step(self, timestamp, sender, c_id):
