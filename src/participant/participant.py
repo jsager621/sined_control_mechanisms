@@ -418,24 +418,19 @@ def calc_opt_day(
         model.solutions.load_from(result)
         profiles = {}
         profiles["load"] = forecasts["load"]
-        profiles["pv"] = -np.round(model.x_pv_p[:](), 1)
-        profiles["ev"] = np.round(model.x_cs_p_charge[:](), 1) - np.round(
-            model.x_cs_p_discharge[:](), 1
+        profiles["pv"] = -np.round(model.x_pv_p[:](), 4)
+        profiles["ev"] = np.round(model.x_cs_p_charge[:](), 4) - np.round(
+            model.x_cs_p_discharge[:](), 4
         )
-        profiles["ev_e"] = np.round(model.x_ev_e[:](), 1)
+        profiles["ev_e"] = np.round(model.x_ev_e[:](), 4)
         profiles["hp"] = forecasts["hp"]
-        profiles["bss"] = np.round(model.x_bss_p_cha[:](), 1) - np.round(
-            model.x_bss_p_disch[:](), 1
+        profiles["bss"] = np.round(model.x_bss_p_cha[:](), 4) - np.round(
+            model.x_bss_p_disch[:](), 4
         )
-        profiles["bss_e"] = np.round(model.x_bss_e[:](), 1)
-        profiles["p_res"] = np.round(model.x_grid_load[:](), 1) - np.round(
-            model.x_grid_feedin[:](), 1
+        profiles["bss_e"] = np.round(model.x_bss_e[:](), 4)
+        profiles["p_res"] = np.round(model.x_grid_load[:](), 4) - np.round(
+            model.x_grid_feedin[:](), 4
         )
-        # if model.x_ev_pen[0]() > 0:
-        #     logging.info(f"Penalty var for EV > 0: {np.round(model.x_ev_pen[0](), 1)}")
-        # print(np.round(model.control_pen_min[:](), 1))
-        # print(np.round(model.control_pen_max[:](), 1))
-        print("Objective value: " + str(pyo.value(model.OBJ)))
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message
