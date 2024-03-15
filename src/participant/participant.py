@@ -53,6 +53,7 @@ class NetParticipant(Agent):
         self.dev["bss"] = self.config["HOUSEHOLD"]["bss"]
         self.dev["ev"] = self.config["HOUSEHOLD"]["ev"]
         self.dev["cs"] = self.config["HOUSEHOLD"]["cs"]
+        self.e_level_save = {}
 
         # initialize residual schedule of the day with zeros for each value
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
@@ -113,6 +114,17 @@ class NetParticipant(Agent):
 
             # recalculate schedule based on new information
             self.compute_and_send_schedule(content.timestamp)
+
+        # if isinstance(content, TimeStepReply):
+        #     logging.info("Update last calc of participant")
+        #     # retrieve energy level of BSS and EV at last time step
+        #     self.dev["bss"]["e_kWh"] = self.e_level_save["bss"]
+        #     self.dev["ev"]["e_kWh"] = self.e_level_save["ev"]
+
+        #     # update result_timeseries_residual
+        #     self.result_timeseries_residual.append(self.residual_schedule)
+
+        #     # send no reply
 
     def apply_control_message(self, content: ControlMechanismMessage):
         """Simply save a control signal that is sent."""
@@ -187,14 +199,8 @@ class NetParticipant(Agent):
 
         # retrieve residual schedule
         self.residual_schedule = schedule["p_res"]
-
-        # retrieve energy level of BSS and EV at last time step (schedule["ev_e"][-1] &
-        # schedule["bss_e"][-1]) JUST FOR LAST SCHEDULE CALCULATION
-        # TODO!
-
-        # update result_timeseries_residual at last calculation of this timestamp
-        # TODO!
-        self.result_timeseries_residual.append(self.residual_schedule)
+        self.e_level_save["bss"] = schedule["bss_e"][-1]
+        self.e_level_save["ev"] = schedule["ev_e"][-1]
 
     def run(self):
         # to proactively do things
