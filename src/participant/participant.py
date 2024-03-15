@@ -3,7 +3,6 @@ import pyomo.environ as pyo
 from pyomo.environ import NonNegativeReals as NNReals
 from pyomo.environ import Var
 import numpy as np
-import pandas as pd
 import asyncio
 import logging
 
@@ -24,8 +23,6 @@ from util import (
     read_prosumer_config,
     time_int_to_str,
 )
-
-import matplotlib.pyplot as plt
 
 ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
@@ -187,18 +184,6 @@ class NetParticipant(Agent):
             step_size_s=self.step_size_s,
             control_sig=self.control_signal,
         )
-
-        # if self.aid == "agent0":
-        #     plt.figure()
-        #     plt.plot(schedule["load"], label="load")
-        #     plt.plot(schedule["pv"], label="pv")
-        #     plt.plot(forecasts["ev"]["consumption"], label="ev cons.")
-        #     plt.plot(schedule["ev"], label="ev")
-        #     plt.plot(schedule["hp"], label="hp")
-        #     plt.plot(schedule["bss"], label="bss")
-        #     plt.plot(schedule["p_res"], label="res")
-        #     plt.legend()
-        #     plt.show()
 
         # retrieve residual schedule
         self.residual_schedule = schedule["p_res"]
