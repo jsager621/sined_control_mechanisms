@@ -68,7 +68,10 @@ class ControlMechanismMessage:
     p_max: np.ndarray[float] = field(default=None)
     p_min: np.ndarray[float] = field(default=None)
     peak_price_dem: float = field(default=None)
+    # demand peak price: to be effective instead of keeping energy and to not use grid energy
+    #     needs to be lower than electricity price and higher than feedin tariff (times resolution)
     peak_price_gen: float = field(default=None)
+    # generation peak price needs to be positive, height ist irrelevant
 
 
 """
