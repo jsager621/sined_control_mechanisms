@@ -25,6 +25,8 @@ from util import (
     time_int_to_str,
 )
 
+import matplotlib.pyplot as plt
+
 ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 # Pyomo released under 3-clause BSD license
@@ -186,6 +188,18 @@ class NetParticipant(Agent):
             control_sig=self.control_signal,
         )
 
+        # if self.aid == "agent0":
+        #     plt.figure()
+        #     plt.plot(schedule["load"], label="load")
+        #     plt.plot(schedule["pv"], label="pv")
+        #     plt.plot(forecasts["ev"]["consumption"], label="ev cons.")
+        #     plt.plot(schedule["ev"], label="ev")
+        #     plt.plot(schedule["hp"], label="hp")
+        #     plt.plot(schedule["bss"], label="bss")
+        #     plt.plot(schedule["p_res"], label="res")
+        #     plt.legend()
+        #     plt.show()
+
         # retrieve residual schedule
         self.residual_schedule = schedule["p_res"]
 
@@ -261,7 +275,7 @@ def calc_opt_day(
         DAY_STEPS, domain=NNReals, bounds=(0, cs_vals["power_kW"])
     )
     model.x_cs_p_discharge = Var(
-        DAY_STEPS, domain=NNReals, bounds=(0, cs_vals["power_kW"])
+        DAY_STEPS, domain=NNReals, bounds=(0, cs_vals["power_discharge_kW"])
     )
     model.x_ev_e = Var(
         DAY_STEPS_P1,
@@ -269,7 +283,7 @@ def calc_opt_day(
         bounds=(0, ev_vals["capacity_kWh"]),
     )
     model.x_ev_pen = Var(range(1), domain=NNReals, bounds=(0, ev_vals["capacity_kWh"]))
-    # variables for control signals regarding residual power
+    # variables for control signals regarding residual power limits
     model.control_pen_max = Var(DAY_STEPS, domain=NNReals)
     model.control_pen_min = Var(DAY_STEPS, domain=NNReals)
 
@@ -279,7 +293,7 @@ def calc_opt_day(
     if isinstance(feedin_tariff, float):
         feedin_tariff = [feedin_tariff for _ in DAY_STEPS]
     ev_penalty = 10 * model.x_ev_pen[0]  # penalize non-filled ev battery
-    ev_dir_cha = sum((t / 1e6 * model.x_cs_p_charge[t]) for t in range(len(DAY_STEPS)))
+    ev_dir_cha = sum((t / 1e9 * model.x_cs_p_charge[t]) for t in range(len(DAY_STEPS)))
     c_bss_energy = (feedin_tariff[-1] + elec_price[-1]) / 2
     bss_incent = (
         -c_bss_energy * model.x_bss_e[DAY_STEPS_P1[-1]] * GRANULARITY
@@ -306,8 +320,8 @@ def calc_opt_day(
     model.OBJ = pyo.Objective(
         expr=sum(
             [
-                elec_price[t] * model.x_grid_load[t] / 1000 * GRANULARITY
-                - feedin_tariff[t] * model.x_grid_feedin[t] / 1000 * GRANULARITY
+                elec_price[t] * model.x_grid_load[t] * GRANULARITY
+                - feedin_tariff[t] * model.x_grid_feedin[t] * GRANULARITY
                 for t in DAY_STEPS
             ]
         )
@@ -374,7 +388,7 @@ def calc_opt_day(
         )
     model.C_ev_home = pyo.ConstraintList()
     for t in DAY_STEPS:
-        if forecasts["ev"]["state"][t] != "home":
+        if forecasts["ev"]["state"][t] != b"home":
             model.C_ev_home.add(expr=model.x_cs_p_charge[t] == 0)
             model.C_ev_home.add(expr=model.x_cs_p_discharge[t] == 0)
     model.C_ev_end = pyo.Constraint(
@@ -419,6 +433,9 @@ def calc_opt_day(
         )
         # if model.x_ev_pen[0]() > 0:
         #     logging.info(f"Penalty var for EV > 0: {np.round(model.x_ev_pen[0](), 1)}")
+        # print(np.round(model.control_pen_min[:](), 1))
+        # print(np.round(model.control_pen_max[:](), 1))
+        print("Objective value: " + str(pyo.value(model.OBJ)))
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message
