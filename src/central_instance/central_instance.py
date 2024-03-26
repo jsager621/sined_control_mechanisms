@@ -2,6 +2,7 @@ from mango import Agent
 import asyncio
 import pandapower as pp
 import pandapower.networks as ppnet
+import numpy as np
 import logging
 from messages.message_classes import (
     TimeStepMessage,
@@ -20,17 +21,24 @@ ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 
 class CentralInstance(Agent):
-    grid = None  # pandapower net object
-    grid_results = {}  # results of grid from powerflow calculation
+    # initialize grid component limits for buses and lines
+    BUS_LV_VM_MIN = 0.9
+    BUS_LV_VM_MAX = 1.1
+    LINE_LV_LOAD_MAX = 24
 
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
+
+        # read config
         self.grid_config = read_grid_config()
+
+        # store length of one simulation step
+        self.step_size_s = 15 * 60  # 15 min steps, 900 seconds
+        self.steps_day = int(ONE_DAY_IN_SECONDS / self.step_size_s)
 
         # initialize grid for simulation
         self.init_grid(grid_name=self.grid_config["GRID"])
-        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
         # initialize list to store result data for buses and lines
         self.result_timeseries_bus_vm_pu = {}
@@ -42,38 +50,31 @@ class CentralInstance(Agent):
         for i_trafo in range(len(self.grid.trafo)):
             self.result_timeseries_line_load[self.grid.trafo.loc[i_trafo, "name"]] = []
 
-        # store participants and their connection to the buses
+        # initialize grid congestions results
+        self.congestions = []
+
+        # store participants and their connection to the buses and check for faults
         self.num_households = self.grid_config["NUM_HOUSEHOLDS"]
         self.num_participants = self.grid_config["NUM_PARTICIPANTS"]
         self.current_participants = 0
-
         if self.num_households > len(self.load_bus_names):
-            raise ValueError(
-                "Trying to create grid with more households than load buses!"
-            )
-
+            raise ValueError("Creating grid with more households than load buses!")
         if self.num_participants > self.num_households:
-            raise ValueError(
-                "Trying to create grid with more participants than households!"
-            )
+            raise ValueError("Creating grid with more participants than households!")
 
-        self.loadbus_names = [
-            self.grid.bus.loc[i_bus, "name"]
-            for i_bus in range(len(self.grid.bus))
-            if "loadbus" in self.grid.bus.loc[i_bus, "name"]
-        ]
-
-        if len(self.loadbus_names) < self.num_participants:
-            raise ValueError(
-                f"{self.num_participants} for {len(self.loadbus_names)} load buses does not work!"
-            )
-
+        # initialize coordination of participants to load buses
         self.load_participant_coord = {}
+
+        # initialize input for recieved schedules from participants
         self.received_schedules = {}
+
+        # initialize status of whether calculation of this time step is finished
         self.time_step_done = False
 
         # store type of current control form
         self.control_type = self.grid_config["CONTROL_TYPE"]
+        self.control_conf = self.grid_config["CONFIG_CONTROL"]
+        self.control_signals = {}
 
     def handle_message(self, content, meta):
         # This method defines what the agent will do with incoming messages.
@@ -132,10 +133,76 @@ class CentralInstance(Agent):
         while len(self.received_schedules[timestamp].keys()) < self.num_participants:
             await asyncio.sleep(0.01)
 
-    def check_schedule_ok(self, list_results_bus, list_results_line):
-        return True
+    def check_schedule_ok(self, list_results_bus, list_results_line) -> bool:
+        """Check grid results for congestion and returns status.
 
-    async def calculate_aggregate_schedule(self, timestamp):
+        Returns:
+            bool: True in case of no congestion, false otherwise
+        """
+        # reset congestion results
+        self.congestions = []
+        status_no_congestion = True
+
+        # first check whether step is generation or demand step
+        mean_voltage_for_steps = np.zeros(self.steps_day)
+        for step in range(len(mean_voltage_for_steps)):
+            np.mean([vm_list[step] for vm_list in list_results_bus.values()])
+
+        # go by both lists of results and check for any limit violation
+        for bus_id, bus_vm_list in list_results_bus.items():
+            for step, value in enumerate(bus_vm_list):
+                if value > self.BUS_LV_VM_MAX:
+                    self.congestions.append(
+                        {
+                            "step": step,
+                            "comp_id": bus_id,
+                            "val": value,
+                            "curtail": "gen",
+                        }
+                    )
+                    status_no_congestion = False
+                elif value < self.BUS_LV_VM_MIN:
+                    self.congestions.append(
+                        {
+                            "step": step,
+                            "comp_id": bus_id,
+                            "val": value,
+                            "curtail": "dem",
+                        }
+                    )
+                    status_no_congestion = False
+        for line_id, line_load_list in list_results_line.items():
+            for step, value in enumerate(line_load_list):
+                if value > self.LINE_LV_LOAD_MAX:
+                    if (
+                        mean_voltage_for_steps[step] > 1.0
+                    ):  # generation-driven congestion
+                        self.congestions.append(
+                            {
+                                "step": step,
+                                "comp_id": line_id,
+                                "val": value,
+                                "curtail": "gen",
+                            }
+                        )
+                    else:  # demand-driven congestion
+                        self.congestions.append(
+                            {
+                                "step": step,
+                                "comp_id": line_id,
+                                "val": value,
+                                "curtail": "dem",
+                            }
+                        )
+                    status_no_congestion = False
+
+        logging.info(
+            f"Central Instance - {len(self.congestions)} congestions detected."
+        )
+
+        return status_no_congestion
+
+    async def calculate_grid_schedule(self, timestamp):
         # NOTE:
         # Assumes all relevant participant schedules are now present in:
         # self.received_schedules[timestamp]
@@ -149,19 +216,21 @@ class CentralInstance(Agent):
         for addr, bus_id in self.load_participant_coord.items():
             bus_to_schedule[bus_id] = self.received_schedules[timestamp][addr]
 
+        # print(bus_to_schedule["loadbus_1_2"])
+
         # initialize schedule results list
         list_results_bus = {}
         list_results_line = {}
-        for bus_name in self.result_timeseries_bus_vm_pu.keys():
-            list_results_bus[bus_name] = []
-        for line_name in self.result_timeseries_line_load.keys():
-            list_results_line[line_name] = []
+        for bus_id in self.result_timeseries_bus_vm_pu.keys():
+            list_results_bus[bus_id] = []
+        for line_id in self.result_timeseries_line_load.keys():
+            list_results_line[line_id] = []
 
-        for i in range(96):
+        for i in range(self.steps_day):
             # form: power_for_buses = {"loadbus_1_1": 2, ...}
             bus_to_power = {}
-            for bus_name in bus_to_schedule.keys():
-                bus_to_power[bus_name] = bus_to_schedule[bus_name][i]
+            for bus_id in bus_to_schedule.keys():
+                bus_to_power[bus_id] = bus_to_schedule[bus_id][i]
 
             # set the inputs from the agents schedules
             self.set_inputs(data_for_buses=bus_to_power)
@@ -173,10 +242,10 @@ class CentralInstance(Agent):
             self.store_grid_results()
 
             # set results into result saving lists
-            for bus_name in self.grid_results_bus.keys():
-                list_results_bus[bus_name].append(self.grid_results_bus[bus_name])
-            for line_name in self.grid_results_line.keys():
-                list_results_line[line_name].append(self.grid_results_line[line_name])
+            for bus_id in self.grid_results_bus.keys():
+                list_results_bus[bus_id].append(self.grid_results_bus[bus_id])
+            for line_id in self.grid_results_line.keys():
+                list_results_line[line_id].append(self.grid_results_line[line_id])
 
         self.time_step_done = self.check_schedule_ok(
             list_results_bus, list_results_line
@@ -185,13 +254,13 @@ class CentralInstance(Agent):
         # this was the last calculation for this time step
         if self.time_step_done:
             # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
-            for bus_name in self.result_timeseries_bus_vm_pu.keys():
-                self.result_timeseries_bus_vm_pu[bus_name].append(
-                    list_results_bus[bus_name]
+            for bus_id in self.result_timeseries_bus_vm_pu.keys():
+                self.result_timeseries_bus_vm_pu[bus_id].append(
+                    list_results_bus[bus_id]
                 )
-            for line_name in self.result_timeseries_line_load.keys():
-                self.result_timeseries_line_load[line_name].append(
-                    list_results_line[line_name]
+            for line_id in self.result_timeseries_line_load.keys():
+                self.result_timeseries_line_load[line_id].append(
+                    list_results_line[line_id]
                 )
 
     def clear_local_schedules(self, timestamp):
@@ -199,7 +268,65 @@ class CentralInstance(Agent):
             del self.received_schedules[timestamp]
 
     async def apply_control_mechanisms(self, timestamp):
-        pass
+        """Creates a control signal with regard to control type strategy."""
+
+        # go by each congestion and save steps with congestions
+        steps_curtail_demand = []
+        steps_curtail_generation = []
+        for cong_dict in self.congestions:
+            if cong_dict["curtail"] == "gen":
+                steps_curtail_generation.append(cong_dict["step"])
+            elif cong_dict["curtail"] == "dem":
+                steps_curtail_demand.append(cong_dict["step"])
+        # take unique values and sort them
+        steps_curtail_demand = sorted(set(steps_curtail_demand))
+        steps_curtail_generation = sorted(set(steps_curtail_generation))
+
+        # create signal with regard to control strategy
+        if self.control_type == "tariff":
+            # adjust tariff
+            for step in steps_curtail_demand:
+                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
+            for step in steps_curtail_generation:
+                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
+        elif self.control_type == "limits":
+            # adjust power limits (with check wether there already was a limit or not)
+            for step in steps_curtail_demand:
+                self.control_signal.p_max[step] = min(
+                    self.control_signal.p_max[step]
+                    + self.control_conf["P_MAX_STEP_kW"],
+                    self.control_conf["P_MAX_INIT_kW"],
+                )
+            for step in steps_curtail_generation:
+                self.control_signal.p_min[step] = min(
+                    self.control_signal.p_min[step]
+                    + self.control_conf["P_MIN_STEP_kW"],
+                    self.control_conf["P_MIN_INIT_kW"],
+                )
+        elif self.control_type == "peak_price":
+            # set peak price for both directions
+            self.control_signal.peak_price_dem = self.control_conf["PEAK_PRICE_DEM"]
+            self.control_signal.peak_price_gen = self.control_conf["PEAK_PRICE_GEN"]
+        else:
+            raise TypeError(
+                f"No control type '{self.control_type}' implemented for Central Instance!"
+                "Only 'tariff', 'limits', and 'peak_price' possible for CONTROL_TYPE!"
+            )
+
+        # send signals to each participant
+        for participant in self.load_participant_coord.keys():
+            content = self.control_signal
+
+            # collect meta data of central instance
+            acl_meta = {"sender_id": self.aid, "sender_addr": self.addr}
+
+            # send message to each participant
+            self.schedule_instant_acl_message(
+                content,
+                (participant.host, participant.port),
+                participant.agent_id,
+                acl_metadata=acl_meta,
+            )
 
     def send_time_step_done_to_syncing_agent(self, sender, c_id):
         # send reply
@@ -212,6 +339,17 @@ class CentralInstance(Agent):
             acl_metadata=acl_meta,
         )
 
+    def reset_control_signal(self, timestamp: int):
+        """Initialize "zero" signals for control."""
+        self.control_signal = ControlMechanismMessage(
+            timestamp=timestamp,
+            tariff_adj=np.zeros(self.steps_day),
+            p_max=np.inf * np.ones(self.steps_day),
+            p_min=-np.inf * np.ones(self.steps_day),
+            peak_price_gen=0.0,
+            peak_price_dem=0.0,
+        )
+
     async def compute_time_step(self, timestamp, sender, c_id):
         # collect agents residual schedules
         if timestamp % ONE_DAY_IN_SECONDS == 0:
@@ -219,20 +357,28 @@ class CentralInstance(Agent):
 
             # always happens at least once
             await self.get_participant_schedules(timestamp)
-            await self.calculate_aggregate_schedule(timestamp)
+            await self.calculate_grid_schedule(timestamp)
+
+            # clear sent signals from steps before
+            self.reset_control_signal(timestamp=timestamp)
 
             # gets instantly skipped if schedules are already ok
-            # flag gets set by calculate_aggregate_schedule when the schedule
+            # flag gets set by calculate_grid_schedule when the schedule
             # fulfilly all requirements
+            step_loops = 0
             while not self.time_step_done:
-                # NOTE: runs the risk of infinitely looping if control mechanisms
-                # do not converge on a viable solution!
-                # TODO: maybe consider max number of retries or ensure there is always
-                # a strong enough final mechanism to ensure compliance
+                # check if looping of sending control signals exceeded max.
+                if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
+                    raise RuntimeError(
+                        f"Too many loops (# = {step_loops}) for control signals!"
+                    )
+
+                # TODO: maybe ensure mechanism is always a strong enough for compliance? (probably not possible)
                 self.clear_local_schedules(timestamp)
                 await self.apply_control_mechanisms(timestamp)
                 await self.get_participant_schedules(timestamp)
-                await self.calculate_aggregate_schedule(timestamp)
+                await self.calculate_grid_schedule(timestamp)
+                step_loops += 1
 
             self.send_time_step_done_to_syncing_agent(sender, c_id)
 
@@ -241,26 +387,35 @@ class CentralInstance(Agent):
             )
 
     def init_grid(self, grid_name: str):
+        # load grid from pandapower
         if grid_name == "kerber_dorfnetz":
             self.grid = ppnet.create_kerber_dorfnetz()
         elif grid_name == "kerber_landnetz":
             self.grid = ppnet.create_kerber_landnetz_kabel_1()
         else:
-            print(f"Grid {self.aid} could not be created.")
-            self.grid = None
+            raise ValueError(
+                f"Grid {self.aid} could not be created - found no grid named {grid_name}"
+            )
+
+        # set all load (re)active power values to 0
+        for idx_l in range(len(self.grid.load)):
+            self.grid.load.at[idx_l, "p_mw"] = 0
+            self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
+
+        # store IDs of loadbuses
+        self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
 
     def set_inputs(self, data_for_buses):
         """Set active/reactive power values for the grid loads."""
         for name_bus, power_value in data_for_buses.items():
             # get the index of the bus
             idx_b = self.grid.bus.index[self.grid.bus["name"] == name_bus].to_list()[0]
-            # get the index of the load and the load element
+            # get the index of the load
             idx_l = self.grid.load.index[self.grid.load["bus"] == idx_b].to_list()[0]
-            element = self.grid.load.loc[idx_l]
 
             # set active power (and remove reactive power value)
-            element.at["p_mw"] = power_value / 1000  # active power in MW
-            element.at["q_mvar"] = 0  # reactive power value
+            self.grid.load.at[idx_l, "p_mw"] = power_value / 1e3  # active power kW->MW
+            self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
 
     def calc_grid_powerflow(self):
         pp.runpp(
@@ -274,21 +429,17 @@ class CentralInstance(Agent):
         self.grid_results_line = {}
         if not self.grid.res_bus.empty:  # powerflow converged
             for i_bus in range(len(self.grid.bus)):
-                self.grid_results_bus[self.grid.bus.loc[i_bus, "name"]] = (
-                    self.grid.res_bus.loc[i_bus, "vm_pu"]
+                self.grid_results_bus[self.grid.bus.loc[i_bus, "name"]] = np.round(
+                    self.grid.res_bus.loc[i_bus, "vm_pu"], 5
                 )
             for i_line in range(len(self.grid.line)):
-                self.grid_results_line[self.grid.line.loc[i_line, "name"]] = (
-                    self.grid.res_line.loc[i_line, "loading_percent"]
+                self.grid_results_line[self.grid.line.loc[i_line, "name"]] = np.round(
+                    self.grid.res_line.loc[i_line, "loading_percent"], 2
                 )
             for i_trafo in range(len(self.grid.trafo)):
-                self.grid_results_line[self.grid.trafo.loc[i_trafo, "name"]] = (
-                    self.grid.res_trafo.loc[i_trafo, "loading_percent"]
+                self.grid_results_line[self.grid.trafo.loc[i_trafo, "name"]] = np.round(
+                    self.grid.res_trafo.loc[i_trafo, "loading_percent"], 2
                 )
-
-    def setup_control_signal(self):
-        # TODO! With regard to type of control
-        self.control_signal = {}
 
     def run(self):
         # to proactively do things

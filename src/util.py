@@ -11,10 +11,10 @@ Collection of utility functions for the simulation.
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 DATA_DIR = os.path.join(THIS_DIR, "..", "data")
-EV_FILE = os.path.join(DATA_DIR, "ev_45kWh.csv")
-HEATPUMP_FILE = os.path.join(DATA_DIR, "heatpump.csv")
-HOUSEHOLD_FILE = os.path.join(DATA_DIR, "household_load.csv")
-PV_FILE = os.path.join(DATA_DIR, "pv_10kw.csv")
+EV_FILE = os.path.join(DATA_DIR, "ev_kWh.csv")
+HEATPUMP_FILE = os.path.join(DATA_DIR, "heatpump_el_kW.csv")
+HOUSEHOLD_FILE = os.path.join(DATA_DIR, "household_load_kW.csv")
+PV_FILE = os.path.join(DATA_DIR, "pv_10kWp_kW.csv")
 
 CONFIG_DIR = os.path.join(THIS_DIR, "..", "config")
 GRID_CONFIG = os.path.join(CONFIG_DIR, "grid.json")
@@ -90,16 +90,6 @@ def read_heatpump_data(t_start, t_end):
     return (rows[:, 1].astype("f"), rows[:, 2].astype("f"))
 
 
-def read_household_data(t_start, t_end):
-    reader = DataReader()
-    np_data = reader.household_data
-    mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
-    rows = np_data[mask]
-
-    # return P_IN_W
-    return rows[:, 1].astype("f")
-
-
 def read_pv_data(t_start, t_end):
     reader = DataReader()
     np_data = reader.pv_data
@@ -111,12 +101,8 @@ def read_pv_data(t_start, t_end):
 
 
 def read_load_data(t_start, t_end):
-    # TODO add this
-    # return dummy data for now
-    return 0.5 * np.ones(96)
-
     reader = DataReader()
-    np_data = reader.load_data
+    np_data = reader.household_data
     mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
     rows = np_data[mask]
 

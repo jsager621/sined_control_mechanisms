@@ -1,6 +1,16 @@
 {
     "GRID": "kerber_dorfnetz",
-    "CONTROL_TYPE": "nothing",
+    "CONTROL_TYPE": "limits",
+    "CONFIG_CONTROL": {
+        "MAX_NUM_LOOPS": 2,
+        "P_MAX_INIT_kW": 8,
+        "P_MAX_STEP_kW": -0.5,
+        "P_MIN_INIT_kW": -10,
+        "P_MIN_STEP_kW": 0.5,
+        "TARIFF_ADJ": 0.03,
+        "PEAK_PRICE_DEM": 0.02,
+        "PEAK_PRICE_GEN": 0.02
+    },
     "NUM_HOUSEHOLDS": 3,
     "NUM_PARTICIPANTS": 3
 }
