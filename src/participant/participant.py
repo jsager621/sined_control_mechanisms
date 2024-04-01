@@ -250,6 +250,19 @@ def calc_opt_day(
     # add optimization variables
     model.x_grid_load = Var(DAY_STEPS, domain=NNReals)
     model.x_grid_feedin = Var(DAY_STEPS, domain=NNReals)
+    if control_sig.conditional_power_threshold is not None:
+        model.x_grid_load_uncond = Var(
+            DAY_STEPS,
+            domain=NNReals,
+            bounds=(0, control_sig.conditional_power_threshold),
+        )
+        model.x_grid_load_cond = Var(DAY_STEPS, domain=NNReals)
+        model.x_grid_feedin_uncond = Var(
+            DAY_STEPS,
+            domain=NNReals,
+            bounds=(0, control_sig.conditional_power_threshold),
+        )
+        model.x_grid_feedin_cond = Var(DAY_STEPS, domain=NNReals)
     model.x_p_peak_load = Var(range(1), domain=NNReals)
     model.x_p_peak_gen = Var(range(1), domain=NNReals)
     model.x_pv_p = Var(DAY_STEPS, domain=NNReals, bounds=(0, pv_vals["power_kWp"]))
@@ -308,14 +321,32 @@ def calc_opt_day(
     # adjust electricity price list with sent control signals
     if control_sig is not None and isinstance(control_sig.tariff_adj, np.ndarray):
         elec_price = list(elec_price + control_sig.tariff_adj)
-    model.OBJ = pyo.Objective(
-        expr=sum(
+    # sum up electricity price and remunderation for grid power of day
+    if control_sig.conditional_power_threshold is not None:
+        # if no conditional power, simply sum up costs for load and remuner. for feedin
+        obj_el_costs = sum(
             [
                 elec_price[t] * model.x_grid_load[t] * GRANULARITY
                 - feedin_tariff[t] * model.x_grid_feedin[t] * GRANULARITY
                 for t in DAY_STEPS
             ]
         )
+    else:
+        # in case of conditional power, add addit. costs for that conditional part only
+        if control_sig.conditional_power_add_cost <= 0:
+            logging.warning("Add. costs for cond. power is negative! Wrong effect!")
+        add_c = control_sig.conditional_power_add_cost
+        obj_el_costs = sum(
+            [
+                elec_price[t] * model.x_grid_load_uncond[t] * GRANULARITY
+                + (elec_price[t] + add_c) * model.x_grid_load_cond[t] * GRANULARITY
+                - feedin_tariff[t] * model.x_grid_feedin_uncond[t] * GRANULARITY
+                - (feedin_tariff[t] - add_c) * model.x_grid_feedin_cond[t] * GRANULARITY
+                for t in DAY_STEPS
+            ]
+        )
+    model.OBJ = pyo.Objective(
+        expr=obj_el_costs
         + obj_signals
         + ev_penalty
         + bss_incent
@@ -336,11 +367,11 @@ def calc_opt_day(
             == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_disch[t]
         )
 
-    # constraints for control signals: go by each separate signal and apply it via constraints
+    # constraints for power limit control signals: apply each signal  separately
     if control_sig is not None:
         model.C_control = pyo.ConstraintList()
         for step in DAY_STEPS:
-            # add constraint for max. and min. power demand at this step, add penalty variable
+            # add constraint for max. and min. power demand at step, add penalty variable
             if control_sig.p_max is not None and control_sig.p_max[step] != np.inf:
                 model.C_control.add(
                     expr=model.x_grid_load[step] - model.x_grid_feedin[step]
@@ -351,6 +382,19 @@ def calc_opt_day(
                     expr=model.x_grid_load[step] - model.x_grid_feedin[step]
                     >= control_sig.p_min[step] - model.control_pen_min[step]
                 )
+
+    # constraints for conditional power control signal: sum up both parts to aggr. power
+    if control_sig is not None and control_sig.conditional_power_threshold is not None:
+        model.C_cond_p = pyo.ConstraintList()
+        for step in DAY_STEPS:
+            model.C_cond_p.add(
+                expr=model.x_grid_load[step]
+                == model.x_grid_load_uncond[step] + model.x_grid_load_cond[step]
+            )
+            model.C_cond_p.add(
+                expr=model.x_grid_feedin[step]
+                == model.x_grid_feedin_uncond[step] + model.x_grid_feedin_cond[step]
+            )
 
     # add constraints: peak and valley
     model.C_peak = pyo.ConstraintList()
