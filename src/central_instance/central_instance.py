@@ -307,6 +307,14 @@ class CentralInstance(Agent):
             # set peak price for both directions
             self.control_signal.peak_price_dem = self.control_conf["PEAK_PRICE_DEM"]
             self.control_signal.peak_price_gen = self.control_conf["PEAK_PRICE_GEN"]
+        elif self.control_type == "conditional_power":
+            # set power threshold and additional costs for power above
+            self.control_signal.conditional_power_threshold = self.control_conf[
+                "COND_POWER_THRESHOLD_kW"
+            ]
+            self.control_signal.conditional_power_add_costs = self.control_conf[
+                "COND_POWER_ADD_COSTS"
+            ]
         else:
             raise TypeError(
                 f"No control type '{self.control_type}' implemented for Central Instance!"

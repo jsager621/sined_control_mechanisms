@@ -72,6 +72,8 @@ class ControlMechanismMessage:
     #     needs to be lower than electricity price and higher than feedin tariff (times resolution)
     peak_price_gen: float = field(default=None)
     # generation peak price needs to be positive, height ist irrelevant
+    conditional_power_threshold: float = field(default=None)
+    conditional_power_add_costs: float = field(default=None)
 
 
 """
