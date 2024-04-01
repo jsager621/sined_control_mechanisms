@@ -322,7 +322,7 @@ def calc_opt_day(
     if control_sig is not None and isinstance(control_sig.tariff_adj, np.ndarray):
         elec_price = list(elec_price + control_sig.tariff_adj)
     # sum up electricity price and remunderation for grid power of day
-    if control_sig.conditional_power_threshold is not None:
+    if control_sig.conditional_power_threshold is None:
         # if no conditional power, simply sum up costs for load and remuner. for feedin
         obj_el_costs = sum(
             [
@@ -333,9 +333,9 @@ def calc_opt_day(
         )
     else:
         # in case of conditional power, add addit. costs for that conditional part only
-        if control_sig.conditional_power_add_cost <= 0:
+        if control_sig.conditional_power_add_costs <= 0:
             logging.warning("Add. costs for cond. power is negative! Wrong effect!")
-        add_c = control_sig.conditional_power_add_cost
+        add_c = control_sig.conditional_power_add_costs
         obj_el_costs = sum(
             [
                 elec_price[t] * model.x_grid_load_uncond[t] * GRANULARITY
