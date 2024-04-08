@@ -116,10 +116,10 @@ class CentralInstance(Agent):
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
-            self.current_participants += 1
             self.load_participant_coord[participant_address] = self.load_bus_names[
                 self.current_participants
             ]
+            self.current_participants += 1
         else:
             logging.warn(
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
@@ -377,9 +377,9 @@ class CentralInstance(Agent):
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
-                    raise RuntimeError(
-                        f"Too many loops (# = {step_loops}) for control signals!"
-                    )
+                    logging.warn(f"Could not resolve all issues in time step: {timestamp}")
+                    self.time_step_done = True
+                    continue
 
                 # TODO: maybe ensure mechanism is always a strong enough for compliance? (probably not possible)
                 self.clear_local_schedules(timestamp)
