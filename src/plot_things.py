@@ -12,10 +12,7 @@ def plot_sim_run(rundir, day):
     # line_load.json
     plot_line_load(os.path.join(rundir, "line_load.json"), rundir, day)
     plot_vm_pu(os.path.join(rundir, "bus_vm_pu.json"), rundir, day)
-
-    for f in [x for x in os.listdir(rundir) if x.startswith("agent")]:
-        plot_agent(f, rundir, day)
-
+    plot_agents(os.path.join(rundir, "agents.json"), rundir, day)
 
 def plot_line_load(line_load_file, rundir, day):
     with open(line_load_file, "r") as f:
@@ -32,9 +29,19 @@ def plot_line_load(line_load_file, rundir, day):
 
 
 def plot_vm_pu(vm_pu_file, rundir, day):
-    pass
+    with open(vm_pu_file, "r") as f:
+        data = json.load(f)
+        
+        # filter day
+        for key in data.keys():
+            data[key] = data[key][day]
 
-def plot_agent(agent_file, rundir, day):
+        df = pd.DataFrame(data)
+        fig = px.line(df)
+        outfile = os.path.join(rundir, "vm_pu.html")
+        fig.write_html(outfile)
+
+def plot_agents(agents_file, rundir, day):
     pass
 
 def main():

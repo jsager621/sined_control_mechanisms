@@ -53,10 +53,13 @@ def process_outputs(participants, central_instance):
         break
 
     os.mkdir(RUNDIR)
+    agents_schedule_log = {}
     for p in participants:
-        filename = os.path.join(RUNDIR, p.aid + ".json")
-        with open(filename, 'w') as f:
-            f.write(json.dumps(p.schedule_log, cls=NumpyEncoder))
+         agents_schedule_log[p.aid] = p.schedule_log
+        
+    filename = os.path.join(RUNDIR, "agents.json")
+    with open(filename, 'w') as f:
+        f.write(json.dumps(agents_schedule_log, cls=NumpyEncoder))
 
     # result_timeseries_bus_vm_pu
     # result_timeseries_line_load
