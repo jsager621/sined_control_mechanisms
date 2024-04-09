@@ -62,6 +62,8 @@ class NetParticipant(Agent):
         # initialize empty control signal from central instance
         self.control_signal: ControlMechanismMessage = ControlMechanismMessage()
 
+        self.schedule_log = {}
+
     async def register_to_central_agent(self, central_address):
         # send message
         content = RegistrationMessage()
@@ -201,6 +203,16 @@ class NetParticipant(Agent):
         self.residual_schedule = schedule["p_res"]
         self.e_level_save["bss"] = schedule["bss_e"][-1]
         self.e_level_save["ev"] = schedule["ev_e"][-1]
+
+        # save schedule for this timestep into the log dictionary
+        # This gets updated each time a new schedule is computed so updates
+        # from control messages automatically override the original schedule for
+        # a given timestamp.
+        self.schedule_log[timestamp] = {
+            "p_res": schedule["p_res"],
+            "bss_e": schedule["bss_e"][-1],
+            "ev_e": schedule["ev_e"][-1]
+        }
 
     def run(self):
         # to proactively do things

@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import os
+import json
+import numpy as np
 from mango import create_container
 from central_instance import CentralInstance
 from participant import NetParticipant
@@ -12,7 +15,13 @@ HOST = "localhost"
 PORT = 5555
 
 logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.WARN)
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 
 async def create_agents_and_containers(n_participants):
@@ -30,8 +39,38 @@ async def create_agents_and_containers(n_participants):
     return (sync_agent, participants, central_instance, [c])
 
 
-def process_outputs(agents):
-    pass
+def process_outputs(participants, central_instance):
+    OUTDIR = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    if not os.path.exists(OUTDIR):
+        os.mkdir(OUTDIR)
+
+    RUNDIR = ""
+    for i in range(100):
+        RUNDIR = os.path.join(OUTDIR, str(i))
+        if os.path.exists(RUNDIR):
+            continue
+
+        break
+
+    os.mkdir(RUNDIR)
+    agents_schedule_log = {}
+    for p in participants:
+         agents_schedule_log[p.aid] = p.schedule_log
+        
+    filename = os.path.join(RUNDIR, "agents.json")
+    with open(filename, 'w') as f:
+        f.write(json.dumps(agents_schedule_log, cls=NumpyEncoder))
+
+    # result_timeseries_bus_vm_pu
+    # result_timeseries_line_load
+    filename = os.path.join(RUNDIR, "bus_vm_pu" + ".json")
+    with open(filename, 'w') as f:
+            f.write(json.dumps(central_instance.result_timeseries_bus_vm_pu, cls=NumpyEncoder))
+
+    filename = os.path.join(RUNDIR, "line_load" + ".json")
+    with open(filename, 'w') as f:
+            f.write(json.dumps(central_instance.result_timeseries_line_load, cls=NumpyEncoder))
+    
 
 
 async def main():
@@ -60,8 +99,7 @@ async def main():
         await c.shutdown()
 
     # presumably do some data collecting and saving here
-    agents = participants.append(central_instance)
-    process_outputs(agents)
+    process_outputs(participants, central_instance)
 
 
 if __name__ == "__main__":

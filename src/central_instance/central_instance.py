@@ -116,10 +116,10 @@ class CentralInstance(Agent):
 
     def add_participant(self, participant_address):
         if self.current_participants < self.num_participants:
-            self.current_participants += 1
             self.load_participant_coord[participant_address] = self.load_bus_names[
                 self.current_participants
             ]
+            self.current_participants += 1
         else:
             logging.warn(
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
@@ -247,21 +247,7 @@ class CentralInstance(Agent):
             for line_id in self.grid_results_line.keys():
                 list_results_line[line_id].append(self.grid_results_line[line_id])
 
-        self.time_step_done = self.check_schedule_ok(
-            list_results_bus, list_results_line
-        )
-
-        # this was the last calculation for this time step
-        if self.time_step_done:
-            # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
-            for bus_id in self.result_timeseries_bus_vm_pu.keys():
-                self.result_timeseries_bus_vm_pu[bus_id].append(
-                    list_results_bus[bus_id]
-                )
-            for line_id in self.result_timeseries_line_load.keys():
-                self.result_timeseries_line_load[line_id].append(
-                    list_results_line[line_id]
-                )
+        return list_results_bus, list_results_line
 
     def clear_local_schedules(self, timestamp):
         if timestamp in self.received_schedules.keys():
@@ -365,10 +351,16 @@ class CentralInstance(Agent):
 
             # always happens at least once
             await self.get_participant_schedules(timestamp)
-            await self.calculate_grid_schedule(timestamp)
+            list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+            self.time_step_done = self.check_schedule_ok(
+                list_results_bus, list_results_line
+                )
 
             # clear sent signals from steps before
             self.reset_control_signal(timestamp=timestamp)
+
+
+            
 
             # gets instantly skipped if schedules are already ok
             # flag gets set by calculate_grid_schedule when the schedule
@@ -377,16 +369,29 @@ class CentralInstance(Agent):
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
-                    raise RuntimeError(
-                        f"Too many loops (# = {step_loops}) for control signals!"
-                    )
+                    logging.warn(f"Could not resolve all issues in time step: {timestamp}")
+                    self.time_step_done = True
+                    continue
 
                 # TODO: maybe ensure mechanism is always a strong enough for compliance? (probably not possible)
                 self.clear_local_schedules(timestamp)
                 await self.apply_control_mechanisms(timestamp)
                 await self.get_participant_schedules(timestamp)
-                await self.calculate_grid_schedule(timestamp)
+                list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+                self.time_step_done = self.check_schedule_ok(
+                    list_results_bus, list_results_line
+                    )
                 step_loops += 1
+
+            # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
+            for bus_id in self.result_timeseries_bus_vm_pu.keys():
+                self.result_timeseries_bus_vm_pu[bus_id].append(
+                    list_results_bus[bus_id]
+                )
+            for line_id in self.result_timeseries_line_load.keys():
+                self.result_timeseries_line_load[line_id].append(
+                    list_results_line[line_id]
+                )
 
             self.send_time_step_done_to_syncing_agent(sender, c_id)
 
