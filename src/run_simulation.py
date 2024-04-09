@@ -67,8 +67,6 @@ def process_outputs(participants, central_instance):
     filename = os.path.join(RUNDIR, "line_load" + ".json")
     with open(filename, 'w') as f:
             f.write(json.dumps(central_instance.result_timeseries_line_load, cls=NumpyEncoder))
-            print(central_instance.result_timeseries_line_load)
-
     
 
 
