@@ -1,6 +1,6 @@
 {
     "GRID": "kerber_dorfnetz",
-    "CONTROL_TYPE": "conditional_power",
+    "CONTROL_TYPE": "none",
     "CONFIG_CONTROL": {
         "MAX_NUM_LOOPS": 2,
         "P_MAX_INIT_kW": 8,

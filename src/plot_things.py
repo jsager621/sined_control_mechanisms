@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
+
 def plot_sim_run(rundir, day):
     # assumed contents of the directory:
     # n times agent<n>.json
@@ -14,10 +15,11 @@ def plot_sim_run(rundir, day):
     plot_vm_pu(os.path.join(rundir, "bus_vm_pu.json"), rundir, day)
     plot_agents(os.path.join(rundir, "agents.json"), rundir, day)
 
+
 def plot_line_load(line_load_file, rundir, day):
     with open(line_load_file, "r") as f:
         data = json.load(f)
-        
+
         # filter day
         for key in data.keys():
             data[key] = data[key][day]
@@ -31,7 +33,7 @@ def plot_line_load(line_load_file, rundir, day):
 def plot_vm_pu(vm_pu_file, rundir, day):
     with open(vm_pu_file, "r") as f:
         data = json.load(f)
-        
+
         # filter day
         for key in data.keys():
             data[key] = data[key][day]
@@ -41,8 +43,10 @@ def plot_vm_pu(vm_pu_file, rundir, day):
         outfile = os.path.join(rundir, "vm_pu.html")
         fig.write_html(outfile)
 
+
 def plot_agents(agents_file, rundir, day):
     pass
+
 
 def main():
     day = 0
@@ -52,7 +56,7 @@ def main():
     else:
         print("Need to specify the directory of the run to plot.")
         return
-    
+
     if len(sys.argv) > 2:
         day = int(sys.argv[2])
 
@@ -61,3 +65,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # to run, use something like python src/plot_things.py "outputs/0" 0

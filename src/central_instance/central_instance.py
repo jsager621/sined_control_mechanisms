@@ -301,6 +301,9 @@ class CentralInstance(Agent):
             self.control_signal.conditional_power_add_costs = self.control_conf[
                 "COND_POWER_ADD_COSTS"
             ]
+        elif self.control_type == "none":
+            # no control for participants is executed
+            pass
         else:
             raise TypeError(
                 f"No control type '{self.control_type}' implemented for Central Instance!"
@@ -351,16 +354,15 @@ class CentralInstance(Agent):
 
             # always happens at least once
             await self.get_participant_schedules(timestamp)
-            list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+            list_results_bus, list_results_line = await self.calculate_grid_schedule(
+                timestamp
+            )
             self.time_step_done = self.check_schedule_ok(
                 list_results_bus, list_results_line
-                )
+            )
 
             # clear sent signals from steps before
             self.reset_control_signal(timestamp=timestamp)
-
-
-            
 
             # gets instantly skipped if schedules are already ok
             # flag gets set by calculate_grid_schedule when the schedule
@@ -369,7 +371,9 @@ class CentralInstance(Agent):
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
-                    logging.warn(f"Could not resolve all issues in time step: {timestamp}")
+                    logging.warn(
+                        f"Could not resolve all issues in time step: {timestamp}"
+                    )
                     self.time_step_done = True
                     continue
 
@@ -377,10 +381,12 @@ class CentralInstance(Agent):
                 self.clear_local_schedules(timestamp)
                 await self.apply_control_mechanisms(timestamp)
                 await self.get_participant_schedules(timestamp)
-                list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+                list_results_bus, list_results_line = (
+                    await self.calculate_grid_schedule(timestamp)
+                )
                 self.time_step_done = self.check_schedule_ok(
                     list_results_bus, list_results_line
-                    )
+                )
                 step_loops += 1
 
             # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION
