@@ -369,9 +369,9 @@ class CentralInstance(Agent):
             if self.control_type == "conditional_power":
                 self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
                 logging.warn(f"Max. # of loops for control type conditional_power = 1!")
-            elif self.control_type == "tariff":
+            elif self.control_type == "peak_price":
                 self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
-                logging.warn(f"Max. # of loops for control type tariff = 1!")
+                logging.warn(f"Max. # of loops for control type peak_price = 1!")
             elif self.control_type == "none":
                 self.control_conf["MAX_NUM_LOOPS"] = 0  # no control signal sent
                 logging.warn(f"Max. # of loops for control type none = 0!")
