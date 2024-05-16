@@ -364,10 +364,21 @@ class CentralInstance(Agent):
             # clear sent signals from steps before
             self.reset_control_signal(timestamp=timestamp)
 
+            step_loops = 1
+            # possibly adjust maximum number of loops according to control type
+            if self.control_type == "conditional_power":
+                self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
+                logging.warn(f"Max. # of loops for control type conditional_power = 1!")
+            elif self.control_type == "tariff":
+                self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
+                logging.warn(f"Max. # of loops for control type tariff = 1!")
+            elif self.control_type == "none":
+                self.control_conf["MAX_NUM_LOOPS"] = 0  # no control signal sent
+                logging.warn(f"Max. # of loops for control type none = 0!")
+
             # gets instantly skipped if schedules are already ok
             # flag gets set by calculate_grid_schedule when the schedule
             # fulfilly all requirements
-            step_loops = 0
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
