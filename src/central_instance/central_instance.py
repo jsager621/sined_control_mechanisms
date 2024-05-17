@@ -24,7 +24,7 @@ class CentralInstance(Agent):
     # initialize grid component limits for buses and lines
     BUS_LV_VM_MIN = 0.9
     BUS_LV_VM_MAX = 1.1
-    LINE_LV_LOAD_MAX = 24
+    LINE_LV_LOAD_MAX = 100
 
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
@@ -146,7 +146,9 @@ class CentralInstance(Agent):
         # first check whether step is generation or demand step
         mean_voltage_for_steps = np.zeros(self.steps_day)
         for step in range(len(mean_voltage_for_steps)):
-            np.mean([vm_list[step] for vm_list in list_results_bus.values()])
+            mean_voltage_for_steps[step] = np.mean(
+                [vm_list[step] for vm_list in list_results_bus.values()]
+            )
 
         # go by both lists of results and check for any limit violation
         for bus_id, bus_vm_list in list_results_bus.items():
@@ -274,7 +276,7 @@ class CentralInstance(Agent):
             for step in steps_curtail_demand:
                 self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
             for step in steps_curtail_generation:
-                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
+                self.control_signal.tariff_adj[step] = -self.control_conf["TARIFF_ADJ"]
         elif self.control_type == "limits":
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
