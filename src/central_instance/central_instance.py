@@ -24,7 +24,7 @@ class CentralInstance(Agent):
     # initialize grid component limits for buses and lines
     BUS_LV_VM_MIN = 0.9
     BUS_LV_VM_MAX = 1.1
-    LINE_LV_LOAD_MAX = 24
+    LINE_LV_LOAD_MAX = 100
 
     def __init__(self, container):
         # We must pass a reference of the container to "mango.Agent":
@@ -146,7 +146,9 @@ class CentralInstance(Agent):
         # first check whether step is generation or demand step
         mean_voltage_for_steps = np.zeros(self.steps_day)
         for step in range(len(mean_voltage_for_steps)):
-            np.mean([vm_list[step] for vm_list in list_results_bus.values()])
+            mean_voltage_for_steps[step] = np.mean(
+                [vm_list[step] for vm_list in list_results_bus.values()]
+            )
 
         # go by both lists of results and check for any limit violation
         for bus_id, bus_vm_list in list_results_bus.items():
@@ -274,7 +276,7 @@ class CentralInstance(Agent):
             for step in steps_curtail_demand:
                 self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
             for step in steps_curtail_generation:
-                self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
+                self.control_signal.tariff_adj[step] = -self.control_conf["TARIFF_ADJ"]
         elif self.control_type == "limits":
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
@@ -301,6 +303,9 @@ class CentralInstance(Agent):
             self.control_signal.conditional_power_add_costs = self.control_conf[
                 "COND_POWER_ADD_COSTS"
             ]
+        elif self.control_type == "none":
+            # no control for participants is executed
+            pass
         else:
             raise TypeError(
                 f"No control type '{self.control_type}' implemented for Central Instance!"
@@ -351,25 +356,37 @@ class CentralInstance(Agent):
 
             # always happens at least once
             await self.get_participant_schedules(timestamp)
-            list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+            list_results_bus, list_results_line = await self.calculate_grid_schedule(
+                timestamp
+            )
             self.time_step_done = self.check_schedule_ok(
                 list_results_bus, list_results_line
-                )
+            )
 
             # clear sent signals from steps before
             self.reset_control_signal(timestamp=timestamp)
 
-
-            
+            step_loops = 1
+            # possibly adjust maximum number of loops according to control type
+            if self.control_type == "conditional_power":
+                self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
+                logging.warn(f"Max. # of loops for control type conditional_power = 1!")
+            elif self.control_type == "peak_price":
+                self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
+                logging.warn(f"Max. # of loops for control type peak_price = 1!")
+            elif self.control_type == "none":
+                self.control_conf["MAX_NUM_LOOPS"] = 0  # no control signal sent
+                logging.warn(f"Max. # of loops for control type none = 0!")
 
             # gets instantly skipped if schedules are already ok
             # flag gets set by calculate_grid_schedule when the schedule
             # fulfilly all requirements
-            step_loops = 0
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
-                    logging.warn(f"Could not resolve all issues in time step: {timestamp}")
+                    logging.warn(
+                        f"Could not resolve all issues in time step: {timestamp}"
+                    )
                     self.time_step_done = True
                     continue
 
@@ -377,10 +394,12 @@ class CentralInstance(Agent):
                 self.clear_local_schedules(timestamp)
                 await self.apply_control_mechanisms(timestamp)
                 await self.get_participant_schedules(timestamp)
-                list_results_bus, list_results_line = await self.calculate_grid_schedule(timestamp)
+                list_results_bus, list_results_line = (
+                    await self.calculate_grid_schedule(timestamp)
+                )
                 self.time_step_done = self.check_schedule_ok(
                     list_results_bus, list_results_line
-                    )
+                )
                 step_loops += 1
 
             # store list_results in result_timeseries JUST FOR LAST SCHEDULE CALCULATION

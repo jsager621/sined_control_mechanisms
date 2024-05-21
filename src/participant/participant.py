@@ -211,7 +211,7 @@ class NetParticipant(Agent):
         self.schedule_log[timestamp] = {
             "p_res": schedule["p_res"],
             "bss_e": schedule["bss_e"][-1],
-            "ev_e": schedule["ev_e"][-1]
+            "ev_e": schedule["ev_e"][-1],
         }
 
     def run(self):
@@ -376,7 +376,10 @@ def calc_opt_day(
             + model.x_cs_p_charge[t]
             + model.x_grid_feedin[t]
             + model.x_bss_p_cha[t]
-            == model.x_pv_p[t] + model.x_grid_load[t] + model.x_bss_p_disch[t]
+            == model.x_pv_p[t]
+            + model.x_grid_load[t]
+            + model.x_bss_p_disch[t]
+            + model.x_cs_p_discharge[t]
         )
 
     # constraints for power limit control signals: apply each signal  separately

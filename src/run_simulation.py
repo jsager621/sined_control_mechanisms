@@ -15,7 +15,8 @@ HOST = "localhost"
 PORT = 5555
 
 logging.basicConfig()
-logging.getLogger().setLevel(logging.WARN)
+logging.getLogger().setLevel(logging.INFO)
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
