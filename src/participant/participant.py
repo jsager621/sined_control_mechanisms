@@ -20,6 +20,7 @@ from util import (
     read_pv_data,
     read_heatpump_data,
     read_load_data,
+    make_idealized_load_day,
     read_prosumer_config,
     time_int_to_str,
 )
@@ -54,6 +55,7 @@ class NetParticipant(Agent):
         self.dev["ev"] = self.config["HOUSEHOLD"]["ev"]
         self.dev["cs"] = self.config["HOUSEHOLD"]["cs"]
         self.e_level_save = {}
+        self.mean_peak_load = self.config["HOUSEHOLD"]["mean_peak_load_kW"]
 
         # initialize residual schedule of the day with zeros for each value
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
@@ -164,11 +166,13 @@ class NetParticipant(Agent):
         t_end = timestamp + ONE_DAY_IN_SECONDS
 
         forecasts = {}
-        forecasts["load"] = (
-            read_load_data(t_start, t_end)
-            * self.config["HOUSEHOLD"]["baseload_kWh_year"]
-            / 4085
-        )
+        # forecasts["load"] = (
+        #     read_load_data(t_start, t_end)
+        #     * self.config["HOUSEHOLD"]["baseload_kWh_year"]
+        #     / 4085
+        # )
+        forecasts["load"] = make_idealized_load_day(self.mean_peak_load)
+
         forecasts["pv"] = (
             read_pv_data(t_start, t_end) * self.dev["pv"]["power_kWp"] / 10
         )

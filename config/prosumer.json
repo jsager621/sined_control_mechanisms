@@ -5,7 +5,8 @@
         "pv": {"power_kWp": 10},
         "bss": {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5},
         "ev": {"capacity_kWh": 60, "e_kWh": 60},
-        "cs": {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0}
+        "cs": {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0},
+        "mean_peak_load_kW": 7
     },
     "TARIFF": {
         "electricity_price": 0.35,

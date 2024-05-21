@@ -22,6 +22,15 @@ PROSUMER_CONFIG = os.path.join(CONFIG_DIR, "prosumer.json")
 SIMULATION_CONFIG = os.path.join(CONFIG_DIR, "simulation.json")
 
 
+ideal_day_rel = [ 
+  0.35, 0.34, 0.33, 0.32, 0.31, 0.30, 0.29, 0.28, 0.27, 0.24, 0.22, 0.2, 0.2, 0.2, 0.2, 0.2, 0.22, 0.24, 0.25, 0.26, 0.28, 0.29, 0.30,
+  0.31, 0.36, 0.41, 0.45, 0.50, 0.53, 0.58, 0.6, 0.6, 0.62, 0.65, 0.66, 0.68, 0.7, 0.71, 0.72, 0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79,
+  0.8, 0.8, 0.79, 0.72, 0.7, 0.68, 0.66, 0.62, 0.6, 0.58, 0.55, 0.54, 0.52, 0.5, 0.49, 0.51, 0.6, 0.68, 0.7, 0.75, 0.78, 0.8, 0.82, 0.84,
+  0.86, 0.88, 0.9, 0.91, 0.92, 0.9, 0.9, 0.87, 0.84, 0.81, 0.78, 0.75, 0.72, 0.69, 0.66, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42,  
+  0.39, 0.36, 0.35
+]
+
+
 # Singleton class to ensure csv files are read only once per process
 # regardless of which agents calls for data first.
 class DataReader(object):
@@ -108,6 +117,10 @@ def read_load_data(t_start, t_end):
 
     # return P_IN_W
     return rows[:, 1].astype("f")
+
+def make_idealized_load_day(p_peak):
+    ideal = np.array(ideal_day_rel)
+    return -1 * ideal * p_peak
 
 
 def read_json(json_file):
