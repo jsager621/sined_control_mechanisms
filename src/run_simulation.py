@@ -10,6 +10,7 @@ from syncing_agent import SyncingAgent
 from messages.message_classes import get_codec
 from datetime import datetime
 from util import read_simulation_config, read_grid_config, time_str_to_int
+import random
 
 HOST = "localhost"
 PORT = 5555
@@ -76,6 +77,7 @@ def process_outputs(participants, central_instance):
 
 async def main():
     sim_config = read_simulation_config()
+    random.seed(sim_config["seed"])
 
     str_start = sim_config["start_time"]
     str_end = sim_config["end_time"]

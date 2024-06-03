@@ -55,7 +55,10 @@ class NetParticipant(Agent):
         self.dev["ev"] = self.config["HOUSEHOLD"]["ev"]
         self.dev["cs"] = self.config["HOUSEHOLD"]["cs"]
         self.e_level_save = {}
-        self.mean_peak_load = self.config["HOUSEHOLD"]["mean_peak_load_kW"]
+
+
+        self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
+        self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
 
         # initialize residual schedule of the day with zeros for each value
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
@@ -171,7 +174,7 @@ class NetParticipant(Agent):
         #     * self.config["HOUSEHOLD"]["baseload_kWh_year"]
         #     / 4085
         # )
-        forecasts["load"] = make_idealized_load_day(self.mean_peak_load)
+        forecasts["load"] = make_idealized_load_day(self.min_peak_load, self.max_peak_load)
 
         forecasts["pv"] = (
             read_pv_data(t_start, t_end) * self.dev["pv"]["power_kWp"] / 10

@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import json
+import random
 
 """
 Collection of utility functions for the simulation.
@@ -118,9 +119,10 @@ def read_load_data(t_start, t_end):
     # return P_IN_W
     return rows[:, 1].astype("f")
 
-def make_idealized_load_day(p_peak):
+def make_idealized_load_day(peak_min, peak_max):
+    peak = random.random() * (peak_max - peak_min) + peak_min
     ideal = np.array(ideal_day_rel)
-    return -1 * ideal * p_peak
+    return -1 * ideal * peak
 
 
 def read_json(json_file):
