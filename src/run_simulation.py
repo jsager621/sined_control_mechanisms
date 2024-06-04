@@ -26,13 +26,42 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-async def create_agents_and_containers(n_participants):
+async def create_agents_and_containers(grid_config):
     # returns list of agents created via config
     # everything single container for now because no reason not to
+    n_participants = grid_config["NUM_PARTICIPANTS"]
 
     c = await create_container(addr=(HOST, PORT), codec=get_codec())
 
-    participants = [NetParticipant(c) for i in range(n_participants)]
+
+    # participant ID decides which devices it has from the config ratios
+    # read ratios
+    r_pv = grid_config["R_PV"]
+    r_ev = grid_config["R_EV"]
+    r_bss = grid_config["R_BSS"]
+    r_cs = grid_config["R_CS"]
+    r_hp = grid_config["R_HP"]
+
+    # make bool lists with ratio amount of true values
+    # then shuffle each list
+    # devices of agent i are given by the values in list i for each list
+    pv = [i < r_pv * n_participants for i in range(n_participants)]
+    ev = [i < r_ev * n_participants for i in range(n_participants)]
+    bss = [i < r_bss * n_participants for i in range(n_participants)]
+    cs = [i < r_cs * n_participants for i in range(n_participants)]
+    hp = [i < r_hp * n_participants for i in range(n_participants)]
+
+    random.shuffle(pv)
+    random.shuffle(ev)
+    random.shuffle(bss)
+    random.shuffle(cs)
+    random.shuffle(hp)
+
+
+    participants = []
+    for i in range(n_participants):
+        participants.append(NetParticipant(c, pv[i], ev[i], bss[i], cs[i], hp[i]))
+
     central_instance = CentralInstance(c)
     agents = participants + [central_instance]
 
@@ -85,10 +114,9 @@ async def main():
     unix_end = time_str_to_int(str_end)
 
     grid_config = read_grid_config()
-    n_participants = grid_config["NUM_PARTICIPANTS"]
 
     sync_agent, participants, central_instance, containers = (
-        await create_agents_and_containers(n_participants)
+        await create_agents_and_containers(grid_config)
     )
 
     for p in participants:

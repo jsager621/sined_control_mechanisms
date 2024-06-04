@@ -120,7 +120,7 @@ def read_load_data(t_start, t_end):
     return rows[:, 1].astype("f")
 
 def make_idealized_load_day(peak_min, peak_max):
-    peak = random.random() * (peak_max - peak_min) + peak_min
+    peak = random.uniform(peak_min, peak_max)
     ideal = np.array(ideal_day_rel)
     return -1 * ideal * peak
 
