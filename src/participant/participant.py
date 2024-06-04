@@ -83,9 +83,14 @@ class NetParticipant(Agent):
         no_ev = {"capacity_kWh": 0, "e_kWh": 0}
         self.dev["ev"] = self.config["HOUSEHOLD"]["ev"] if self.has_ev else no_ev
 
+        # expects a number
+        self.dev["hp"] = random.uniform(
+                self.config["HOUSEHOLD"]["hp"]["min_kWh_el_year"],
+                self.config["HOUSEHOLD"]["hp"]["max_kWh_el_year"]
+                ) if self.has_hp else 0
+
+
         self.e_level_save = {}
-
-
         self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
         self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
 
@@ -222,7 +227,7 @@ class NetParticipant(Agent):
         # set to 0 if no HP
         forecasts["hp"] = (
             read_heatpump_data(t_start, t_end)[0]
-            * self.config["HOUSEHOLD"]["heatpump_kWh_el_year"]
+            * self.dev["hp"]
             / 7042
         ) if self.has_hp else np.zeros(96)
 
