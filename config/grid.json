@@ -14,5 +14,10 @@
         "COND_POWER_ADD_COSTS": 0.05
     },
     "NUM_HOUSEHOLDS": 57,
-    "NUM_PARTICIPANTS": 57
+    "NUM_PARTICIPANTS": 57,
+    "R_PV": 0.8,
+    "R_EV": 0.5,
+    "R_BSS": 1,
+    "R_CS": 1,
+    "R_HP": 1
 }

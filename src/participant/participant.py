@@ -5,6 +5,7 @@ from pyomo.environ import Var
 import numpy as np
 import asyncio
 import logging
+import random
 
 from messages.message_classes import (
     TimeStepMessage,
@@ -20,6 +21,7 @@ from util import (
     read_pv_data,
     read_heatpump_data,
     read_load_data,
+    make_idealized_load_day,
     read_prosumer_config,
     time_int_to_str,
 )
@@ -30,12 +32,18 @@ ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 
 class NetParticipant(Agent):
-    def __init__(self, container):
+    def __init__(self, container, has_pv, has_ev, has_bss, has_cs, has_hp):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
 
         self.central_agent = None
         self.registration_future = None
+
+        self.has_pv = has_pv
+        self.has_ev = has_ev
+        self.has_bss = has_bss
+        self.has_cs = has_cs
+        self.has_hp = has_hp
 
         # initialize list to store result data
         self.result_timeseries_residual = []
@@ -49,11 +57,42 @@ class NetParticipant(Agent):
 
         # store data of the devices
         self.dev = {}
-        self.dev["pv"] = self.config["HOUSEHOLD"]["pv"]
-        self.dev["bss"] = self.config["HOUSEHOLD"]["bss"]
-        self.dev["ev"] = self.config["HOUSEHOLD"]["ev"]
-        self.dev["cs"] = self.config["HOUSEHOLD"]["cs"]
+
+
+        # decide if this agent should have the device
+        # if so: read the corresponding device config and roll its size for this agent
+
+        # max power value for each device is randomzied once at creation time
+
+        # expects: {"power_kWp": 10}
+        pv_size_kw = random.uniform(
+            self.config["HOUSEHOLD"]["pv"]["min_kWp"],
+            self.config["HOUSEHOLD"]["pv"]["max_kWp"]
+            ) if self.has_pv else 0
+        self.dev["pv"] = {"power_kWp": pv_size_kw}
+
+        # expects: {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5}
+        no_bss = {"capacity_kWh": 0, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5}
+        self.dev["bss"] = self.config["HOUSEHOLD"]["bss"] if self.has_bss else no_bss
+
+        # expects {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0}
+        no_cs = {"power_kW": 0, "efficiency": 0.95, "power_discharge_kW": 0}
+        self.dev["cs"] = self.config["HOUSEHOLD"]["cs"] if self.has_cs else no_cs
+
+        # expects {"capacity_kWh": 60, "e_kWh": 60}
+        no_ev = {"capacity_kWh": 0, "e_kWh": 0}
+        self.dev["ev"] = self.config["HOUSEHOLD"]["ev"] if self.has_ev else no_ev
+
+        # expects a number
+        self.dev["hp"] = random.uniform(
+                self.config["HOUSEHOLD"]["hp"]["min_kWh_el_year"],
+                self.config["HOUSEHOLD"]["hp"]["max_kWh_el_year"]
+                ) if self.has_hp else 0
+
+
         self.e_level_save = {}
+        self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
+        self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
 
         # initialize residual schedule of the day with zeros for each value
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
@@ -164,22 +203,33 @@ class NetParticipant(Agent):
         t_end = timestamp + ONE_DAY_IN_SECONDS
 
         forecasts = {}
-        forecasts["load"] = (
-            read_load_data(t_start, t_end)
-            * self.config["HOUSEHOLD"]["baseload_kWh_year"]
-            / 4085
-        )
+        # forecasts["load"] = (
+        #     read_load_data(t_start, t_end)
+        #     * self.config["HOUSEHOLD"]["baseload_kWh_year"]
+        #     / 4085
+        # )
+        forecasts["load"] = make_idealized_load_day(self.min_peak_load, self.max_peak_load)
+
+        # set to 0 if no PV
         forecasts["pv"] = (
             read_pv_data(t_start, t_end) * self.dev["pv"]["power_kWp"] / 10
         )
+
         ev_state, ev_consumption = read_ev_data(t_start, t_end)
+
+        # set to 0 if no EV
         ev_consumption = ev_consumption * self.dev["ev"]["capacity_kWh"] / 60
-        forecasts["ev"] = {"state": ev_state, "consumption": ev_consumption}
+        forecasts["ev"] = {
+            "state": ev_state, 
+            "consumption": ev_consumption
+            }
+
+        # set to 0 if no HP
         forecasts["hp"] = (
             read_heatpump_data(t_start, t_end)[0]
-            * self.config["HOUSEHOLD"]["heatpump_kWh_el_year"]
+            * self.dev["hp"]
             / 7042
-        )
+        ) if self.has_hp else np.zeros(96)
 
         return forecasts
 
