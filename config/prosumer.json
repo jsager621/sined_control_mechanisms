@@ -1,15 +1,16 @@
 {
     "HOUSEHOLD": {
         "baseload_kWh_year": 4085,
-        "hp": {"min_kWh_el_year": 5000, "max_kWh_el_year": 10000},
-        "pv": {"min_kWp": 5, "max_kWp": 15},
-        "bss": {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5},
-        "ev": {"capacity_kWh": 60, "e_kWh": 60},
+        "baseload": {"min_kWh_year": 3500, "max_kWh_year": 6000},
+        "hp": {"min_kWh_el_year": 4500, "max_kWh_el_year": 7000},
+        "pv": {"min_kWp": 8, "max_kWp": 17},
+        "bss": {"capacity_kWh": 10, "power_kW": 7, "efficiency": 0.95, "e_kWh": 0},
+        "ev": {"capacity_kWh": 50, "e_kWh": 50},
         "cs": {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0},
         "peak_load_kW": {"min": 5, "max": 10}
     },
     "TARIFF": {
-        "electricity_price": 0.35,
+        "electricity_price": 0.30,
         "feedin_tariff": 0.07
     }
 }
