@@ -58,21 +58,24 @@ class NetParticipant(Agent):
         # store data of the devices
         self.dev = {}
 
-
         # decide if this agent should have the device
         # if so: read the corresponding device config and roll its size for this agent
 
         # max power value for each device is randomzied once at creation time
 
         # expects: {"power_kWp": 10}
-        pv_size_kw = random.uniform(
-            self.config["HOUSEHOLD"]["pv"]["min_kWp"],
-            self.config["HOUSEHOLD"]["pv"]["max_kWp"]
-            ) if self.has_pv else 0
+        pv_size_kw = (
+            random.uniform(
+                self.config["HOUSEHOLD"]["pv"]["min_kWp"],
+                self.config["HOUSEHOLD"]["pv"]["max_kWp"],
+            )
+            if self.has_pv
+            else 0
+        )
         self.dev["pv"] = {"power_kWp": pv_size_kw}
 
         # expects: {"capacity_kWh": 10, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5}
-        no_bss = {"capacity_kWh": 0, "power_kW": 10, "efficiency": 0.95, "e_kWh": 5}
+        no_bss = {"capacity_kWh": 0, "power_kW": 10, "efficiency": 0.95, "e_kWh": 0}
         self.dev["bss"] = self.config["HOUSEHOLD"]["bss"] if self.has_bss else no_bss
 
         # expects {"power_kW": 11, "efficiency": 0.95, "power_discharge_kW": 0}
@@ -84,11 +87,14 @@ class NetParticipant(Agent):
         self.dev["ev"] = self.config["HOUSEHOLD"]["ev"] if self.has_ev else no_ev
 
         # expects a number
-        self.dev["hp"] = random.uniform(
+        self.dev["hp"] = (
+            random.uniform(
                 self.config["HOUSEHOLD"]["hp"]["min_kWh_el_year"],
-                self.config["HOUSEHOLD"]["hp"]["max_kWh_el_year"]
-                ) if self.has_hp else 0
-
+                self.config["HOUSEHOLD"]["hp"]["max_kWh_el_year"],
+            )
+            if self.has_hp
+            else 0
+        )
 
         self.e_level_save = {}
         self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
@@ -208,7 +214,9 @@ class NetParticipant(Agent):
         #     * self.config["HOUSEHOLD"]["baseload_kWh_year"]
         #     / 4085
         # )
-        forecasts["load"] = make_idealized_load_day(self.min_peak_load, self.max_peak_load)
+        forecasts["load"] = make_idealized_load_day(
+            self.min_peak_load, self.max_peak_load
+        )
 
         # set to 0 if no PV
         forecasts["pv"] = (
@@ -219,17 +227,14 @@ class NetParticipant(Agent):
 
         # set to 0 if no EV
         ev_consumption = ev_consumption * self.dev["ev"]["capacity_kWh"] / 60
-        forecasts["ev"] = {
-            "state": ev_state, 
-            "consumption": ev_consumption
-            }
+        forecasts["ev"] = {"state": ev_state, "consumption": ev_consumption}
 
         # set to 0 if no HP
         forecasts["hp"] = (
-            read_heatpump_data(t_start, t_end)[0]
-            * self.dev["hp"]
-            / 7042
-        ) if self.has_hp else np.zeros(96)
+            (read_heatpump_data(t_start, t_end)[0] * self.dev["hp"] / 7042)
+            if self.has_hp
+            else np.zeros(96)
+        )
 
         return forecasts
 
