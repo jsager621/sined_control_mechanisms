@@ -219,7 +219,7 @@ class NetParticipant(Agent):
         #     / 4085
         # )
         forecasts["load"] = make_idealized_load_day(
-            self.min_peak_load, self.max_peak_load
+            self.min_peak_load, self.max_peak_load, self.agent_nr
         )
 
         # set to 0 if no PV
