@@ -5,6 +5,8 @@ import numpy as np
 import json
 import random
 
+from load_curves import LOAD_CURVES_DAY_REL
+
 """
 Collection of utility functions for the simulation.
 """
@@ -12,6 +14,7 @@ Collection of utility functions for the simulation.
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 DATA_DIR = os.path.join(THIS_DIR, "..", "data")
+EV_DIR = os.path.join(DATA_DIR, "ev")
 EV_FILE = os.path.join(DATA_DIR, "ev_kWh.csv")
 HEATPUMP_FILE = os.path.join(DATA_DIR, "heatpump_el_kW.csv")
 HOUSEHOLD_FILE = os.path.join(DATA_DIR, "household_load_kW.csv")
@@ -22,16 +25,6 @@ GRID_CONFIG = os.path.join(CONFIG_DIR, "grid.json")
 PROSUMER_CONFIG = os.path.join(CONFIG_DIR, "prosumer.json")
 SIMULATION_CONFIG = os.path.join(CONFIG_DIR, "simulation.json")
 
-
-ideal_day_rel = [ 
-  0.35, 0.34, 0.33, 0.32, 0.31, 0.30, 0.29, 0.28, 0.27, 0.24, 0.22, 0.2, 0.2, 0.2, 0.2, 0.2, 0.22, 0.24, 0.25, 0.26, 0.28, 0.29, 0.30,
-  0.31, 0.36, 0.41, 0.45, 0.50, 0.53, 0.58, 0.6, 0.6, 0.62, 0.65, 0.66, 0.68, 0.7, 0.71, 0.72, 0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79,
-  0.8, 0.8, 0.79, 0.72, 0.7, 0.68, 0.66, 0.62, 0.6, 0.58, 0.55, 0.54, 0.52, 0.5, 0.49, 0.51, 0.6, 0.68, 0.7, 0.75, 0.78, 0.8, 0.82, 0.84,
-  0.86, 0.88, 0.9, 0.91, 0.92, 0.9, 0.9, 0.87, 0.84, 0.81, 0.78, 0.75, 0.72, 0.69, 0.66, 0.63, 0.60, 0.57, 0.54, 0.51, 0.48, 0.45, 0.42,  
-  0.39, 0.36, 0.35
-]
-
-
 # Singleton class to ensure csv files are read only once per process
 # regardless of which agents calls for data first.
 class DataReader(object):
@@ -41,17 +34,16 @@ class DataReader(object):
         return cls.instance
 
     def __init__(self):
-        # read in the four data files
-        raw_ev_data = pd.read_csv(EV_FILE).to_numpy()
+        # read ev data in bulk from directory
+        self.ev_data_sets = read_ev_data_sets()
+
+        # read in the other data files
         raw_heatpump_data = pd.read_csv(HEATPUMP_FILE).to_numpy()
         raw_household_data = pd.read_csv(HOUSEHOLD_FILE).to_numpy()
         raw_pv_data = pd.read_csv(PV_FILE).to_numpy()
 
         # parse all timestamps to unix time
-        raw_ev_data[:, 0] = [
-            time_str_to_int(timestamp_str) for timestamp_str in raw_ev_data[:, 0]
-        ]
-        self.ev_data = raw_ev_data
+        
 
         raw_heatpump_data[:, 0] = [
             time_str_to_int(timestamp_str) for timestamp_str in raw_heatpump_data[:, 0]
@@ -68,6 +60,24 @@ class DataReader(object):
         ]
         self.pv_data = raw_pv_data
 
+def read_ev_data_sets():
+    ev_data_sets = []
+
+    for file in os.listdir(EV_DIR):
+        filename = os.fsdecode(file)
+        if not filename.endswith(".csv"):
+            continue
+
+        filename = os.path.join(EV_DIR, filename)
+        raw_ev_data = pd.read_csv(filename).to_numpy()
+        # parse all timestamps to unix time
+        raw_ev_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_ev_data[:, 0]
+        ]
+        ev_data_sets.append(raw_ev_data)
+
+    return ev_data_sets
+
 
 def time_str_to_int(timestamp_str):
     # hack to enforce utc timestamp because it's annoying
@@ -79,10 +89,12 @@ def time_str_to_int(timestamp_str):
 def time_int_to_str(timestamp_int):
     return str(datetime.utcfromtimestamp(timestamp_int))
 
-
-def read_ev_data(t_start, t_end):
+# read the ev corresponding to this agent number, determined by modulo on the 
+# number of EV data sets we have
+def read_ev_data(t_start, t_end, nr):
     reader = DataReader()
-    np_data = reader.ev_data
+    n_data_sets = len(reader.ev_data_sets)
+    np_data = reader.ev_data_sets[nr % n_data_sets]
     mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
     rows = np_data[mask]
 
@@ -119,7 +131,10 @@ def read_load_data(t_start, t_end):
     # return P_IN_W
     return rows[:, 1].astype("f")
 
-def make_idealized_load_day(peak_min, peak_max):
+def make_idealized_load_day(peak_min, peak_max, nr):
+    n_load_days = len(LOAD_CURVES_DAY_REL)
+    ideal_day_rel = LOAD_CURVES_DAY_REL[nr % n_load_days]
+
     peak = random.uniform(peak_min, peak_max)
     ideal = np.array(ideal_day_rel)
     return -1 * ideal * peak
