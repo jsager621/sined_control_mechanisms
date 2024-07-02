@@ -35,6 +35,10 @@ class NetParticipant(Agent):
     def __init__(self, container, has_pv, has_ev, has_bss, has_cs, has_hp):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
+        
+        # default naming for agents in the container is "agent<x>" where <x> is an incrementing numbeer
+        # we save this number as int for modulo use in EV and Load selection
+        self.agent_nr = int(self.aid[5:])
 
         self.central_agent = None
         self.registration_future = None
@@ -223,7 +227,7 @@ class NetParticipant(Agent):
             read_pv_data(t_start, t_end) * self.dev["pv"]["power_kWp"] / 10
         )
 
-        ev_state, ev_consumption = read_ev_data(t_start, t_end)
+        ev_state, ev_consumption = read_ev_data(t_start, t_end, self.agent_nr)
 
         # set to 0 if no EV
         ev_consumption = ev_consumption * self.dev["ev"]["capacity_kWh"] / 60

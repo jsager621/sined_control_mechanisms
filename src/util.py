@@ -12,6 +12,7 @@ Collection of utility functions for the simulation.
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 DATA_DIR = os.path.join(THIS_DIR, "..", "data")
+EV_DIR = os.path.join(DATA_DIR, "ev")
 EV_FILE = os.path.join(DATA_DIR, "ev_kWh.csv")
 HEATPUMP_FILE = os.path.join(DATA_DIR, "heatpump_el_kW.csv")
 HOUSEHOLD_FILE = os.path.join(DATA_DIR, "household_load_kW.csv")
@@ -41,17 +42,16 @@ class DataReader(object):
         return cls.instance
 
     def __init__(self):
-        # read in the four data files
-        raw_ev_data = pd.read_csv(EV_FILE).to_numpy()
+        # read ev data in bulk from directory
+        self.ev_data_sets = read_ev_data_sets()
+
+        # read in the other data files
         raw_heatpump_data = pd.read_csv(HEATPUMP_FILE).to_numpy()
         raw_household_data = pd.read_csv(HOUSEHOLD_FILE).to_numpy()
         raw_pv_data = pd.read_csv(PV_FILE).to_numpy()
 
         # parse all timestamps to unix time
-        raw_ev_data[:, 0] = [
-            time_str_to_int(timestamp_str) for timestamp_str in raw_ev_data[:, 0]
-        ]
-        self.ev_data = raw_ev_data
+        
 
         raw_heatpump_data[:, 0] = [
             time_str_to_int(timestamp_str) for timestamp_str in raw_heatpump_data[:, 0]
@@ -68,6 +68,24 @@ class DataReader(object):
         ]
         self.pv_data = raw_pv_data
 
+def read_ev_data_sets():
+    ev_data_sets = []
+
+    for file in os.listdir(EV_DIR):
+        filename = os.fsdecode(file)
+        if not filename.endswith(".csv"):
+            continue
+
+        filename = os.path.join(EV_DIR, filename)
+        raw_ev_data = pd.read_csv(filename).to_numpy()
+        # parse all timestamps to unix time
+        raw_ev_data[:, 0] = [
+            time_str_to_int(timestamp_str) for timestamp_str in raw_ev_data[:, 0]
+        ]
+        ev_data_sets.append(raw_ev_data)
+
+    return ev_data_sets
+
 
 def time_str_to_int(timestamp_str):
     # hack to enforce utc timestamp because it's annoying
@@ -79,10 +97,12 @@ def time_str_to_int(timestamp_str):
 def time_int_to_str(timestamp_int):
     return str(datetime.utcfromtimestamp(timestamp_int))
 
-
-def read_ev_data(t_start, t_end):
+# read the ev corresponding to this agent number, determined by modulo on the 
+# number of EV data sets we have
+def read_ev_data(t_start, t_end, nr):
     reader = DataReader()
-    np_data = reader.ev_data
+    n_data_sets = len(reader.ev_data_sets)
+    np_data = reader.ev_data_sets[nr % n_data_sets]
     mask = (np_data[:, 0] >= t_start) & (np_data[:, 0] < t_end)
     rows = np_data[mask]
 
