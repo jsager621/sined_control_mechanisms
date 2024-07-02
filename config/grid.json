@@ -2,22 +2,22 @@
     "GRID": "kerber_dorfnetz",
     "CONTROL_TYPE": "none",
     "CONFIG_CONTROL": {
-        "MAX_NUM_LOOPS": 2,
-        "P_MAX_INIT_kW": 8,
-        "P_MAX_STEP_kW": -0.5,
+        "MAX_NUM_LOOPS": 0,
+        "P_MAX_INIT_kW": 10,
+        "P_MAX_STEP_kW": -1,
         "P_MIN_INIT_kW": -10,
-        "P_MIN_STEP_kW": 0.5,
+        "P_MIN_STEP_kW": 1,
         "TARIFF_ADJ": 0.03,
         "PEAK_PRICE_DEM": 0.02,
         "PEAK_PRICE_GEN": 0.02,
-        "COND_POWER_THRESHOLD_kW": 8,
+        "COND_POWER_THRESHOLD_kW": 6,
         "COND_POWER_ADD_COSTS": 0.05
     },
     "NUM_HOUSEHOLDS": 57,
     "NUM_PARTICIPANTS": 57,
     "R_PV": 0.8,
-    "R_EV": 0.5,
-    "R_BSS": 1,
+    "R_EV": 0.9,
+    "R_BSS": 0.5,
     "R_CS": 1,
-    "R_HP": 1
+    "R_HP": 0.8
 }

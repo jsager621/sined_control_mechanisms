@@ -22,8 +22,8 @@ ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 class CentralInstance(Agent):
     # initialize grid component limits for buses and lines
-    BUS_LV_VM_MIN = 0.9
-    BUS_LV_VM_MAX = 1.1
+    BUS_LV_VM_MIN = 0.95
+    BUS_LV_VM_MAX = 1.05
     LINE_LV_LOAD_MAX = 100
 
     def __init__(self, container):
@@ -201,6 +201,7 @@ class CentralInstance(Agent):
         logging.info(
             f"Central Instance - {len(self.congestions)} congestions detected."
         )
+        logging.info(f"Central Instance - congested steps: {self.congestions}")
 
         return status_no_congestion
 
@@ -286,7 +287,7 @@ class CentralInstance(Agent):
                     self.control_conf["P_MAX_INIT_kW"],
                 )
             for step in steps_curtail_generation:
-                self.control_signal.p_min[step] = min(
+                self.control_signal.p_min[step] = max(
                     self.control_signal.p_min[step]
                     + self.control_conf["P_MIN_STEP_kW"],
                     self.control_conf["P_MIN_INIT_kW"],
@@ -389,6 +390,10 @@ class CentralInstance(Agent):
                     )
                     self.time_step_done = True
                     continue
+
+                logging.info(
+                    f"Central Instance - Loop number {step_loops} for step {timestamp}."
+                )
 
                 # TODO: maybe ensure mechanism is always a strong enough for compliance? (probably not possible)
                 self.clear_local_schedules(timestamp)
