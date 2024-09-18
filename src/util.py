@@ -25,6 +25,7 @@ GRID_CONFIG = os.path.join(CONFIG_DIR, "grid.json")
 PROSUMER_CONFIG = os.path.join(CONFIG_DIR, "prosumer.json")
 SIMULATION_CONFIG = os.path.join(CONFIG_DIR, "simulation.json")
 
+
 # Singleton class to ensure csv files are read only once per process
 # regardless of which agents calls for data first.
 class DataReader(object):
@@ -43,7 +44,6 @@ class DataReader(object):
         raw_pv_data = pd.read_csv(PV_FILE).to_numpy()
 
         # parse all timestamps to unix time
-        
 
         raw_heatpump_data[:, 0] = [
             time_str_to_int(timestamp_str) for timestamp_str in raw_heatpump_data[:, 0]
@@ -59,6 +59,7 @@ class DataReader(object):
             time_str_to_int(timestamp_str) for timestamp_str in raw_pv_data[:, 0]
         ]
         self.pv_data = raw_pv_data
+
 
 def read_ev_data_sets():
     ev_data_sets = []
@@ -89,7 +90,8 @@ def time_str_to_int(timestamp_str):
 def time_int_to_str(timestamp_int):
     return str(datetime.utcfromtimestamp(timestamp_int))
 
-# read the ev corresponding to this agent number, determined by modulo on the 
+
+# read the ev corresponding to this agent number, determined by modulo on the
 # number of EV data sets we have
 def read_ev_data(t_start, t_end, nr):
     reader = DataReader()
@@ -131,13 +133,14 @@ def read_load_data(t_start, t_end):
     # return P_IN_W
     return rows[:, 1].astype("f")
 
+
 def make_idealized_load_day(peak_min, peak_max, nr):
     n_load_days = len(LOAD_CURVES_DAY_REL)
     ideal_day_rel = LOAD_CURVES_DAY_REL[nr % n_load_days]
 
     peak = random.uniform(peak_min, peak_max)
     ideal = np.array(ideal_day_rel)
-    return -1 * ideal * peak
+    return ideal * peak
 
 
 def read_json(json_file):
