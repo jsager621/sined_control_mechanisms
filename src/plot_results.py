@@ -3,10 +3,10 @@ import sys
 import json
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import copy
+
+# import matplotlib.dates as mdates
+# import copy
 
 
 def timesteps_to_datetime(timesteps_np: np.ndarray) -> np.datetime64:
@@ -169,7 +169,7 @@ def plot_vm_pu(vm_pu_file, rundir, days):
         for i, value in enumerate(n_up_list):
             plt.text(i, value + 1, str(value), ha="center", va="bottom")
         for i, value in enumerate(n_lw_list):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
+            plt.text(i, value - 1, str(value), ha="center", va="bottom")
         plt.ylabel("number of violated steps")
         plt.ylim((min(1.1 * min(n_lw_list), -1), max(1.1 * max(n_up_list), 1)))
         plt.xticks(rotation=45, ha="right")
@@ -186,7 +186,7 @@ def plot_vm_pu(vm_pu_file, rundir, days):
         min_val = round(df_voltage.min().min(), 4)
         mean_val = round(df_voltage.mean().mean(), 4)
         num_up = sum(n_up_list)
-        num_lw = sum(n_lw_list)
+        num_lw = -sum(n_lw_list)
         print(
             f"BUS: Max {max_val} , Min {min_val} , Avg {mean_val} , #O_up {num_up} , #O_lw {num_lw}"
         )
@@ -321,9 +321,16 @@ def plot_agents(agents_file, rundir, days):
                 sc_ratio.append(0)
             else:
                 sc_ratio.append(
-                    (amount_e_gen[idx] - amount_e_feedin[idx]) / amount_e_gen[idx] * 100
+                    round(
+                        (amount_e_gen[idx] - amount_e_feedin[idx])
+                        / amount_e_gen[idx]
+                        * 100,
+                        1,
+                    )
                 )
-            ss_ratio.append(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100)
+            ss_ratio.append(
+                round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 1)
+            )
         fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
         plt.bar(data_res["p_res"].keys(), sc_ratio, width=0.8)
         for i, value in enumerate(sc_ratio):
