@@ -498,7 +498,7 @@ def calc_opt_day(
         ) * GRANULARITY
         model.C_ev_coupl.add(
             expr=model.x_ev_e[t + 1]
-            == model.x_ev_e[t] + e_adapt - forecasts["ev"]["consumption"][t]
+            == model.x_ev_e[t] + e_adapt - forecasts["ev"]["consumption"][t] / 0.95
         )
     model.C_ev_home = pyo.ConstraintList()
     for t in DAY_STEPS:
