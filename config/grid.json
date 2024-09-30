@@ -17,7 +17,7 @@
     "NUM_PARTICIPANTS": 57,
     "R_PV": 0.86,
     "R_EV": 1,
-    "R_BSS": 0.3,
+    "R_BSS": 0.35,
     "R_CS": 1,
     "R_HP": 1
 }

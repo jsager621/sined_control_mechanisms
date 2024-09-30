@@ -11,6 +11,7 @@ from messages.message_classes import get_codec
 from datetime import datetime
 from util import read_simulation_config, read_grid_config, time_str_to_int
 import random
+import pandas as pd
 
 HOST = "localhost"
 PORT = 5556
@@ -58,7 +59,27 @@ async def create_agents_and_containers(grid_config):
 
     participants = []
     for i in range(n_participants):
-        participants.append(NetParticipant(c, pv[i], ev[i], bss[i], cs[i], hp[i]))
+        participants.append(
+            NetParticipant(
+                container=c,
+                has_pv=pv[i],
+                has_ev=ev[i],
+                has_bss=pv[i] and bss[i],
+                has_cs=cs[i],
+                has_hp=hp[i],
+            )
+        )
+
+    df_part = pd.DataFrame(columns=["PV", "EV", "BSS", "CS", "HP"])
+    for idx, part in enumerate(participants):
+        df_part.loc[idx] = [
+            part.dev["pv"]["power_kWp"],
+            part.dev["ev"]["capacity_kWh"],
+            part.dev["bss"]["capacity_kWh"],
+            part.dev["cs"]["power_kW"],
+            part.dev["hp"],
+        ]
+    # print(df_part)
 
     central_instance = CentralInstance(c)
     agents = participants + [central_instance]
