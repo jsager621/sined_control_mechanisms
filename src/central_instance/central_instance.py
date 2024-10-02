@@ -2,6 +2,7 @@ from mango import Agent
 import asyncio
 import pandapower as pp
 import pandapower.networks as ppnet
+import simbench as sb
 import numpy as np
 import logging
 from messages.message_classes import (
@@ -429,6 +430,14 @@ class CentralInstance(Agent):
             self.grid = ppnet.create_kerber_dorfnetz()
         elif grid_name == "kerber_landnetz":
             self.grid = ppnet.create_kerber_landnetz_kabel_1()
+        elif any(string in grid_name for string in ["rural", "semiurb", "urban"]):
+            self.grid = sb.get_simbench_net(sb_code_info=grid_name)
+            if grid_name == "1-LV-rural1--0-sw" or grid_name == "1-LV-rural1--0-no_sw":
+                self.grid.bus.index = self.grid.bus.index.where(
+                    self.grid.bus.index != 42, 14
+                )
+            if grid_name == "1-LV-rural2--1-sw":
+                self.grid.bus.loc[0, "vm_pu"] = 1.0
         else:
             raise ValueError(
                 f"Grid {self.aid} could not be created - found no grid named {grid_name}"
@@ -441,6 +450,12 @@ class CentralInstance(Agent):
 
         # store IDs of loadbuses
         self.load_bus_names = [x for x in self.grid.bus["name"] if x.startswith("load")]
+        if self.load_bus_names == []:  # no loads - seems to be simbench grid
+            self.load_bus_names = [
+                b_name
+                for idx, b_name in enumerate(self.grid.bus["name"])
+                if b_name.startswith("LV") and idx in self.grid.load["bus"].values
+            ]
 
     def set_inputs(self, data_for_buses):
         """Set active/reactive power values for the grid loads."""
@@ -448,11 +463,21 @@ class CentralInstance(Agent):
             # get the index of the bus
             idx_b = self.grid.bus.index[self.grid.bus["name"] == name_bus].to_list()[0]
             # get the index of the load
-            idx_l = self.grid.load.index[self.grid.load["bus"] == idx_b].to_list()[0]
+            idx_load_to_bus = self.grid.load["bus"] == idx_b
+            load_list = self.grid.load.index[idx_load_to_bus].to_list()
 
-            # set active power (and remove reactive power value)
-            self.grid.load.at[idx_l, "p_mw"] = power_value / 1e3  # active power kW->MW
-            self.grid.load.at[idx_l, "q_mvar"] = 0  # reactive power value
+            for i in range(len(load_list)):
+                if i == 0:  # only for first load, not for all loads at this bus
+                    # set active power (and remove reactive power value)
+                    self.grid.load.at[load_list[i], "p_mw"] = (
+                        power_value / 1e3
+                    )  # active power kW->MW
+                    self.grid.load.at[load_list[i], "q_mvar"] = (
+                        0  # reactive power value
+                    )
+                else:
+                    self.grid.load.at[load_list[i], "p_mw"] = 0
+                    self.grid.load.at[load_list[i], "q_mvar"] = 0
 
     def calc_grid_powerflow(self):
         pp.runpp(

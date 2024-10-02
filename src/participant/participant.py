@@ -35,7 +35,7 @@ class NetParticipant(Agent):
     def __init__(self, container, has_pv, has_ev, has_bss, has_cs, has_hp):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
-        
+
         # default naming for agents in the container is "agent<x>" where <x> is an incrementing numbeer
         # we save this number as int for modulo use in EV and Load selection
         self.agent_nr = int(self.aid[5:])
@@ -267,10 +267,15 @@ class NetParticipant(Agent):
         # This gets updated each time a new schedule is computed so updates
         # from control messages automatically override the original schedule for
         # a given timestamp.
+        bss_cha = [max(p, 0) for p in schedule["bss"]]
+        bss_discha = [min(p, 0) for p in schedule["bss"]]
+        ev_cha = [max(p, 0) for p in schedule["ev"]]
+        ev_discha = [min(p, 0) for p in schedule["ev"]]
         self.schedule_log[timestamp] = {
+            "price": schedule["price"],
             "p_res": schedule["p_res"],
-            "bss_e": schedule["bss_e"][-1],
-            "ev_e": schedule["ev_e"][-1],
+            "p_cons": schedule["load"] + schedule["hp"] + ev_cha + bss_cha,
+            "p_gen": schedule["pv"] + bss_discha + ev_discha,
         }
 
     def run(self):
@@ -493,7 +498,7 @@ def calc_opt_day(
         ) * GRANULARITY
         model.C_ev_coupl.add(
             expr=model.x_ev_e[t + 1]
-            == model.x_ev_e[t] + e_adapt - forecasts["ev"]["consumption"][t]
+            == model.x_ev_e[t] + e_adapt - forecasts["ev"]["consumption"][t] / 0.95
         )
     model.C_ev_home = pyo.ConstraintList()
     for t in DAY_STEPS:
@@ -540,6 +545,7 @@ def calc_opt_day(
         profiles["p_res"] = np.round(model.x_grid_load[:](), 4) - np.round(
             model.x_grid_feedin[:](), 4
         )
+        profiles["price"] = elec_price
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message

@@ -11,9 +11,10 @@ from messages.message_classes import get_codec
 from datetime import datetime
 from util import read_simulation_config, read_grid_config, time_str_to_int
 import random
+import pandas as pd
 
 HOST = "localhost"
-PORT = 5555
+PORT = 5556
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -32,7 +33,6 @@ async def create_agents_and_containers(grid_config):
     n_participants = grid_config["NUM_PARTICIPANTS"]
 
     c = await create_container(addr=(HOST, PORT), codec=get_codec())
-
 
     # participant ID decides which devices it has from the config ratios
     # read ratios
@@ -57,10 +57,29 @@ async def create_agents_and_containers(grid_config):
     random.shuffle(cs)
     random.shuffle(hp)
 
-
     participants = []
     for i in range(n_participants):
-        participants.append(NetParticipant(c, pv[i], ev[i], bss[i], cs[i], hp[i]))
+        participants.append(
+            NetParticipant(
+                container=c,
+                has_pv=pv[i],
+                has_ev=ev[i],
+                has_bss=pv[i] and bss[i],
+                has_cs=cs[i],
+                has_hp=hp[i],
+            )
+        )
+
+    df_part = pd.DataFrame(columns=["PV", "EV", "BSS", "CS", "HP"])
+    for idx, part in enumerate(participants):
+        df_part.loc[idx] = [
+            part.dev["pv"]["power_kWp"],
+            part.dev["ev"]["capacity_kWh"],
+            part.dev["bss"]["capacity_kWh"],
+            part.dev["cs"]["power_kW"],
+            part.dev["hp"],
+        ]
+    # print(df_part)
 
     central_instance = CentralInstance(c)
     agents = participants + [central_instance]
@@ -86,22 +105,25 @@ def process_outputs(participants, central_instance):
     os.mkdir(RUNDIR)
     agents_schedule_log = {}
     for p in participants:
-         agents_schedule_log[p.aid] = p.schedule_log
-        
+        agents_schedule_log[p.aid] = p.schedule_log
+
     filename = os.path.join(RUNDIR, "agents.json")
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         f.write(json.dumps(agents_schedule_log, cls=NumpyEncoder))
 
     # result_timeseries_bus_vm_pu
     # result_timeseries_line_load
     filename = os.path.join(RUNDIR, "bus_vm_pu" + ".json")
-    with open(filename, 'w') as f:
-            f.write(json.dumps(central_instance.result_timeseries_bus_vm_pu, cls=NumpyEncoder))
+    with open(filename, "w") as f:
+        f.write(
+            json.dumps(central_instance.result_timeseries_bus_vm_pu, cls=NumpyEncoder)
+        )
 
     filename = os.path.join(RUNDIR, "line_load" + ".json")
-    with open(filename, 'w') as f:
-            f.write(json.dumps(central_instance.result_timeseries_line_load, cls=NumpyEncoder))
-    
+    with open(filename, "w") as f:
+        f.write(
+            json.dumps(central_instance.result_timeseries_line_load, cls=NumpyEncoder)
+        )
 
 
 async def main():
