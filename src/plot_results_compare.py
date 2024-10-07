@@ -30,7 +30,7 @@ def comp_results_line(res_dict):
     plt.bar(res_dict.keys(), list_max_val, bottom=list_min_val, width=0.8)
     for i, value in enumerate(list_max_val):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.text(i, value - 1, str(list_min_val[i]), ha="center", va="top")
+        plt.text(i, list_min_val[i] - 1, str(list_min_val[i]), ha="center", va="top")
     plt.ylabel("value range for line loadings, in %")
     plt.ylim((0, max(1.1 * max(list_max_val), 100)))
     plt.xticks(rotation=45, ha="right")
@@ -81,102 +81,114 @@ def comp_results_line(res_dict):
 
 
 def comp_results_bus(res_dict):
-    with open(vm_pu_file, "r") as f:
-        data = json.load(f)
-        data_res = {}
-        days_plot_data = {}
+    # range from max to min value for all simulations
+    list_max_val = []
+    list_min_val = []
+    for name, res_sim in res_dict.items():
+        list_max_val.append(res_sim["max_val"])
+        list_min_val.append(res_sim["min_val"])
 
-        # go by all buses and sort the results in lists
-        for bus, results_list in data.items():
-            data_res[bus] = []
-            days_plot_data[bus] = []
-            for idx_day, res_list_day in enumerate(results_list):
-                for val in res_list_day:
-                    data_res[bus].append(val)
-                    if days is not None and idx_day in days:
-                        days_plot_data[bus].append(val)
-        df_voltage = pd.DataFrame(data_res)
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_max_val, bottom=list_min_val, width=0.8)
+    for i, value in enumerate(list_max_val):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+        plt.text(i, list_min_val[i] - 1, str(list_min_val[i]), ha="center", va="top")
+    plt.ylabel("value range for bus voltage magnitude, in p.u.")
+    plt.ylim((0, max(1.1 * max(list_max_val), 100)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "bus_val_range.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
 
-        # plot of line loading for the selected day(s)
-        if days is not None:
-            fig = plt.figure(figsize=(10, 4))
-            plt.xlabel("time")
-            plt.ylabel("Voltage magnitude, in p.u.")
-            plt.xlim(0, len(days) * 96)
-            # default_date_format = mdates.DateFormatter("%m-%d %H:%M")
-            # plt.gca().xaxis.set_major_formatter(default_date_format)
-            for name, profile in days_plot_data.items():
-                plt.plot(profile, label=name)
-            # plt.legend()
-            fig.get_axes()[0].set_rasterized(True)
-            plt.savefig(
-                os.path.join(rundir, "days_bus_vm_pu.png"),
-                dpi=300,
-                format="png",
-                bbox_inches="tight",
-            )
+    # number of violations plus overload work
+    list_vio_up = []
+    list_vio_low = []
+    list_ovl_sum_up = []
+    list_ovl_sum_lw = []
+    for name, res_sim in res_dict.items():
+        list_vio_up.append(sum(res_sim["num_ovl_up_list"]))
+        list_vio_low.append(sum(res_sim["num_ovl_lw_list"]))
+        list_ovl_sum_up.append(res_sim["ovl_sum_ov"])
+        list_ovl_sum_lw.append(res_sim["ovl_sum_lw"])
 
-        # boxplot for all buses
-        fig = plt.figure(figsize=(25, 3))
-        plt.title("Box plot of bus voltage magnitude")
-        plt.ylabel("Voltage magnitude, in p.u.")
-        df_voltage.boxplot()
-        plt.xticks(rotation=45, ha="right")
-        fig.get_axes()[0].set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "bus_boxpl.png"),
-            dpi=300,
-            format="png",
-            bbox_inches="tight",
-        )
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_vio_up, width=0.8)
+    plt.bar(res_dict.keys(), list_vio_low, width=0.8)
+    for i, value in enumerate(list_vio_up):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    for i, value in enumerate(list_vio_low):
+        plt.text(i, value - 1, str(value), ha="center", va="top")
+    plt.ylabel("number of violated steps")
+    plt.ylim((min(1.1 * min(list_vio_low), -1), max(1.1 * max(list_vio_up), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "bus_num_viol.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
 
-        # number of violations
-        threshold_up = 1.05
-        threshold_lw = 0.95
-        sum_vm_ov = 0
-        sum_vm_un = 0
-        fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-        n_up_list = []
-        n_lw_list = []
-        for name in days_plot_data.keys():
-            n_up_list.append(sum(df_voltage[name] > threshold_up))
-            n_lw_list.append(-sum(df_voltage[name] < threshold_lw))
-            sum_vm_ov += round(
-                sum(df_voltage[name][df_voltage[name] > threshold_up] - threshold_up), 4
-            )
-            sum_vm_un += round(
-                sum(threshold_lw - df_voltage[name][df_voltage[name] < threshold_lw]), 4
-            )
-        plt.bar(days_plot_data.keys(), n_up_list, width=0.8)
-        plt.bar(days_plot_data.keys(), n_lw_list, width=0.8)
-        for i, value in enumerate(n_up_list):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        for i, value in enumerate(n_lw_list):
-            plt.text(i, value - 1, str(value), ha="center", va="bottom")
-        plt.ylabel("number of violated steps")
-        plt.ylim((min(1.1 * min(n_lw_list), -1), max(1.1 * max(n_up_list), 1)))
-        plt.xticks(rotation=45, ha="right")
-        ax.set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "bus_num_viol.png"),
-            dpi=300,
-            format="png",
-            bbox_inches="tight",
-        )
-
-        # printing of statistics
-        max_val = round(df_voltage.max().max(), 4)
-        min_val = round(df_voltage.min().min(), 4)
-        mean_val = round(df_voltage.mean().mean(), 4)
-        num_up = sum(n_up_list)
-        num_lw = -sum(n_lw_list)
-        print(
-            f"BUS: Max {max_val} , Min {min_val} , Avg {mean_val} , #O_up {num_up} , "
-            f"#O_lw {num_lw}, Sum vm over {sum_vm_ov}, sum vm under {sum_vm_un}"
-        )
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_ovl_sum_up, width=0.8)
+    plt.bar(res_dict.keys(), list_ovl_sum_lw, width=0.8)
+    for i, value in enumerate(list_ovl_sum_up):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    for i, value in enumerate(list_ovl_sum_lw):
+        plt.text(i, value - 1, str(value), ha="center", va="top")
+    plt.ylabel("bus sum voltage limit violation, in p.u.")
+    plt.ylim((min(1.1 * min(list_ovl_sum_lw), -1), max(1.1 * max(list_ovl_sum_up), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "bus_vm_ovl_sum.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
 
 
 def comp_results_agents(res_dict):
+    # energy an cost values
+    list_energy = []
+    list_cost = []
+    for name, res_sim in res_dict.items():
+        list_energy.append(res_sim["num_ovl_sum"])
+        list_cost.append(res_sim["ovl_work_kWh"])
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_violations, width=0.8)
+    for i, value in enumerate(list_violations):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    plt.ylabel("number of violated steps")
+    plt.ylim((0, max(1.1 * max(list_violations), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "bus_num_viol.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_ovl_work, width=0.8)
+    for i, value in enumerate(list_ovl_work):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    plt.ylabel("bus sum voltage limit violation, in p.u.")
+    plt.ylim((0, max(1.1 * max(list_ovl_work), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "bus_vm_ovl_sum.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
     with open(agents_file, "r") as f:
         data = json.load(f)
         data_res = {"price": {}, "p_res": {}, "p_cons": {}, "p_gen": {}}
