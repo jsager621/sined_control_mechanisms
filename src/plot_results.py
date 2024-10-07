@@ -77,12 +77,20 @@ def plot_line_load(line_load_file, rundir, days):
             bbox_inches="tight",
         )
 
-        # number of violations
+        # number of violations plus overload work
         threshold = 100
+        ovl_work_kWh = 0
         fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
         n_overloads_list = []
         for name in days_plot_data.keys():
             n_overloads_list.append(sum(df_loading[name] > threshold))
+            ovl_work_kWh += round(
+                sum(
+                    (df_loading[name][df_loading[name] > threshold] - threshold)
+                    * 400
+                    / 4
+                )
+            )
         plt.bar(days_plot_data.keys(), n_overloads_list, width=0.8)
         for i, value in enumerate(n_overloads_list):
             plt.text(i, value + 1, str(value), ha="center", va="bottom")
@@ -102,7 +110,48 @@ def plot_line_load(line_load_file, rundir, days):
         min_val = df_loading.min().min()
         mean_val = df_loading.mean().mean()
         num_ovl = sum(n_overloads_list)
-        print(f"LINE: Max {max_val} , Min {min_val} , Avg {mean_val} , #Ovl {num_ovl}")
+        print(
+            f"LINE: Max {max_val} , Min {min_val} , Avg {mean_val} , #Ovl {num_ovl}, Ovl work {ovl_work_kWh} kWh"
+        )
+
+
+def get_line_load(line_load_file) -> dict:
+    res_dict = {}
+
+    with open(line_load_file, "r") as f:
+        data = json.load(f)
+        data_res = {}
+
+        # go by all lines and sort the results in lists
+        for line, results_list in data.items():
+            data_res[line] = []
+            for idx_day, res_list_day in enumerate(results_list):
+                for val in res_list_day:
+                    data_res[line].append(val)
+        res_dict["df"] = pd.DataFrame(data_res)
+
+        # number of violations plus overload work
+        threshold = 100
+        ovl_work_kWh = 0
+        n_overloads_list = []
+        for name in data_res.keys():
+            n_overloads_list.append(sum(res_dict["df"][name] > threshold))
+            ovl_work_kWh += round(
+                sum(
+                    (res_dict["df"][name][res_dict["df"][name] > threshold] - threshold)
+                    * 400
+                    / 4
+                )
+            )
+        res_dict["num_ovl_list"] = n_overloads_list
+        res_dict["ovl_work_kWh"] = ovl_work_kWh
+
+        res_dict["max_val"] = round(res_dict["df"].max().max(), 3)
+        res_dict["min_val"] = round(res_dict["df"].min().min(), 3)
+        res_dict["mean_val"] = round(res_dict["df"].mean().mean(), 3)
+        res_dict["num_ovl_sum"] = round(sum(n_overloads_list), 3)
+
+    return res_dict
 
 
 def plot_vm_pu(vm_pu_file, rundir, days):
@@ -158,12 +207,20 @@ def plot_vm_pu(vm_pu_file, rundir, days):
         # number of violations
         threshold_up = 1.05
         threshold_lw = 0.95
+        sum_vm_ov = 0
+        sum_vm_un = 0
         fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
         n_up_list = []
         n_lw_list = []
         for name in days_plot_data.keys():
             n_up_list.append(sum(df_voltage[name] > threshold_up))
             n_lw_list.append(-sum(df_voltage[name] < threshold_lw))
+            sum_vm_ov += round(
+                sum(df_voltage[name][df_voltage[name] > threshold_up] - threshold_up), 4
+            )
+            sum_vm_un += round(
+                sum(threshold_lw - df_voltage[name][df_voltage[name] < threshold_lw]), 4
+            )
         plt.bar(days_plot_data.keys(), n_up_list, width=0.8)
         plt.bar(days_plot_data.keys(), n_lw_list, width=0.8)
         for i, value in enumerate(n_up_list):
@@ -188,8 +245,61 @@ def plot_vm_pu(vm_pu_file, rundir, days):
         num_up = sum(n_up_list)
         num_lw = -sum(n_lw_list)
         print(
-            f"BUS: Max {max_val} , Min {min_val} , Avg {mean_val} , #O_up {num_up} , #O_lw {num_lw}"
+            f"BUS: Max {max_val} , Min {min_val} , Avg {mean_val} , #O_up {num_up} , "
+            f"#O_lw {num_lw}, Sum vm over {sum_vm_ov}, sum vm under {sum_vm_un}"
         )
+
+
+def get_vm_pu(vm_pu_file) -> dict:
+    res_dict = {}
+
+    with open(vm_pu_file, "r") as f:
+        data = json.load(f)
+        data_res = {}
+
+        # go by all buses and sort the results in lists
+        for bus, results_list in data.items():
+            data_res[bus] = []
+            for idx_day, res_list_day in enumerate(results_list):
+                for val in res_list_day:
+                    data_res[bus].append(val)
+        res_dict["df"] = pd.DataFrame(data_res)
+
+        # number of violations
+        threshold_up = 1.05
+        threshold_lw = 0.95
+        sum_vm_ov = 0
+        sum_vm_un = 0
+        n_up_list = []
+        n_lw_list = []
+        for name in data_res.keys():
+            n_up_list.append(sum(res_dict["df"][name] > threshold_up))
+            n_lw_list.append(-sum(res_dict["df"][name] < threshold_lw))
+            sum_vm_ov += round(
+                sum(
+                    res_dict["df"][name][res_dict["df"][name] > threshold_up]
+                    - threshold_up
+                ),
+                4,
+            )
+            sum_vm_un += round(
+                sum(
+                    threshold_lw
+                    - res_dict["df"][name][res_dict["df"][name] < threshold_lw]
+                ),
+                4,
+            )
+
+        res_dict["num_ovl_up_list"] = n_up_list
+        res_dict["num_ovl_lw_list"] = n_lw_list
+        res_dict["ovl_sum_ov"] = sum_vm_ov
+        res_dict["ovl_sum_lw"] = sum_vm_un
+
+        res_dict["max_val"] = round(res_dict["df"].max().max(), 4)
+        res_dict["min_val"] = round(res_dict["df"].min().min(), 4)
+        res_dict["mean_val"] = round(res_dict["df"].mean().mean(), 4)
+
+    return res_dict
 
 
 def plot_agents(agents_file, rundir, days):
@@ -369,6 +479,86 @@ def plot_agents(agents_file, rundir, days):
             f"AGENTS: MeanE {mean_energy} kWh , MeanC {mean_cost} EUR , MeanSC {mean_sc} "
             f", MeanSS {mean_ss}"
         )
+
+
+def get_agents_res(agents_file):
+    res_dict = {}
+
+    with open(agents_file, "r") as f:
+        data = json.load(f)
+        data_res = {"price": {}, "p_res": {}, "p_cons": {}, "p_gen": {}}
+        days_plot_data = {"price": {}, "p_res": {}, "p_cons": {}, "p_gen": {}}
+
+        # go by all agents and sort the results in lists
+        for agent, results in data.items():
+            data_res["price"][agent] = []
+            data_res["p_res"][agent] = []
+            data_res["p_cons"][agent] = []
+            data_res["p_gen"][agent] = []
+            days_plot_data["price"][agent] = []
+            days_plot_data["p_res"][agent] = []
+            days_plot_data["p_cons"][agent] = []
+            days_plot_data["p_gen"][agent] = []
+            for idx_day, timestamp in enumerate(results.keys()):
+                data_res["price"][agent].extend(results[timestamp]["price"])
+                data_res["p_res"][agent].extend(results[timestamp]["p_res"])
+                data_res["p_cons"][agent].extend(results[timestamp]["p_cons"])
+                data_res["p_gen"][agent].extend(results[timestamp]["p_gen"])
+        res_dict["df"] = pd.DataFrame(data_res["p_res"])
+
+        # amount of energy and costs
+        amount_e = []
+        amount_e_feedin = []
+        amount_e_demand = []
+        amount_e_gen = []
+        amount_e_cons = []
+        amount_costs = []
+        for name, profile in data_res["p_res"].items():
+            amount_e.append(round(sum(profile) / 4))
+            amount_e_feedin.append(round(sum(val for val in profile if val < 0) / 4))
+            amount_e_demand.append(round(sum(val for val in profile if val > 0) / 4))
+            amount_e_cons.append(round(sum(data_res["p_cons"][name]) / 4))
+            amount_e_gen.append(round(sum(data_res["p_gen"][name]) / 4))
+            grid_cost = (
+                sum(
+                    [
+                        p * c
+                        for p, c in zip(
+                            data_res["p_res"][name], data_res["price"][name]
+                        )
+                        if p > 0
+                    ]
+                )
+                / 4
+            )
+            grid_remun = -sum([p * 0.07 for p in data_res["p_res"][name] if p < 0]) / 4
+            amount_costs.append(round(grid_cost - grid_remun))
+
+        # self-consumption and self-sufficiency
+        sc_ratio = []
+        ss_ratio = []
+        for idx, name in enumerate(data_res["p_res"].keys()):
+            if amount_e_gen[idx] == 0:
+                sc_ratio.append(0)
+            else:
+                sc_ratio.append(
+                    round(
+                        (amount_e_gen[idx] - amount_e_feedin[idx])
+                        / amount_e_gen[idx]
+                        * 100,
+                        1,
+                    )
+                )
+            ss_ratio.append(
+                round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 1)
+            )
+
+        res_dict["mean_energy"] = round(sum(amount_e) / len(amount_e), 1)
+        res_dict["mean_cost"] = round(sum(amount_costs) / len(amount_costs), 1)
+        res_dict["mean_sc"] = round(sum(sc_ratio) / len(sc_ratio), 1)
+        res_dict["mean_ss"] = round(sum(ss_ratio) / len(ss_ratio), 1)
+
+    return res_dict
 
 
 def main():
