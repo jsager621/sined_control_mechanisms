@@ -156,215 +156,61 @@ def comp_results_agents(res_dict):
     # energy an cost values
     list_energy = []
     list_cost = []
+    list_sc = []
+    list_ss = []
     for name, res_sim in res_dict.items():
-        list_energy.append(res_sim["num_ovl_sum"])
-        list_cost.append(res_sim["ovl_work_kWh"])
+        list_energy.append(res_sim["mean_energy"])
+        list_cost.append(res_sim["mean_cost"])
+        list_sc.append(res_sim["mean_sc"])
+        list_ss.append(res_sim["mean_ss"])
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-    plt.bar(res_dict.keys(), list_violations, width=0.8)
-    for i, value in enumerate(list_violations):
+    plt.bar(res_dict.keys(), list_energy, width=0.8)
+    for i, value in enumerate(list_energy):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
-    plt.ylabel("number of violated steps")
-    plt.ylim((0, max(1.1 * max(list_violations), 1)))
+    plt.ylabel("average energy, in kWh")
+    plt.ylim((0, max(1.1 * max(list_energy), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
-        os.path.join("outputs", "comp", "bus_num_viol.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
+        os.path.join("outputs", "comp", "agent_energy_avg.png"), dpi=300, format="png"
     )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-    plt.bar(res_dict.keys(), list_ovl_work, width=0.8)
-    for i, value in enumerate(list_ovl_work):
+    plt.bar(res_dict.keys(), list_cost, width=0.8)
+    for i, value in enumerate(list_cost):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
-    plt.ylabel("bus sum voltage limit violation, in p.u.")
-    plt.ylim((0, max(1.1 * max(list_ovl_work), 1)))
+    plt.ylabel("average costs, in EUR")
+    plt.ylim((0, max(1.1 * max(list_cost), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
-        os.path.join("outputs", "comp", "bus_vm_ovl_sum.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
+        os.path.join("outputs", "comp", "agent_cost_avg.png"), dpi=300, format="png"
     )
-    with open(agents_file, "r") as f:
-        data = json.load(f)
-        data_res = {"price": {}, "p_res": {}, "p_cons": {}, "p_gen": {}}
-        days_plot_data = {"price": {}, "p_res": {}, "p_cons": {}, "p_gen": {}}
 
-        # go by all agents and sort the results in lists
-        for agent, results in data.items():
-            data_res["price"][agent] = []
-            data_res["p_res"][agent] = []
-            data_res["p_cons"][agent] = []
-            data_res["p_gen"][agent] = []
-            days_plot_data["price"][agent] = []
-            days_plot_data["p_res"][agent] = []
-            days_plot_data["p_cons"][agent] = []
-            days_plot_data["p_gen"][agent] = []
-            for idx_day, timestamp in enumerate(results.keys()):
-                data_res["price"][agent].extend(results[timestamp]["price"])
-                data_res["p_res"][agent].extend(results[timestamp]["p_res"])
-                data_res["p_cons"][agent].extend(results[timestamp]["p_cons"])
-                data_res["p_gen"][agent].extend(results[timestamp]["p_gen"])
-                if days is not None and idx_day in days:
-                    days_plot_data["price"][agent].extend(results[timestamp]["price"])
-                    days_plot_data["p_res"][agent].extend(results[timestamp]["p_res"])
-                    days_plot_data["p_cons"][agent].extend(results[timestamp]["p_cons"])
-                    days_plot_data["p_gen"][agent].extend(results[timestamp]["p_gen"])
-        df_p_res = pd.DataFrame(data_res["p_res"])
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_sc, width=0.8)
+    for i, value in enumerate(list_sc):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    plt.ylabel("average self-consumption, in %")
+    plt.ylim((0, max(1.1 * max(list_sc), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "agent_sc_avg.png"), dpi=300, format="png"
+    )
 
-        # plot of residual power for the selected day(s)
-        if days is not None:
-            fig = plt.figure(figsize=(10, 4))
-            plt.xlabel("time")
-            plt.ylabel("Power, in kW")
-            plt.xlim(0, len(days) * 96)
-            for name, profile in days_plot_data["p_res"].items():
-                plt.plot(profile, label=name)
-            # plt.legend()
-            fig.get_axes()[0].set_rasterized(True)
-            plt.savefig(
-                os.path.join(rundir, "days_agents_p.png"),
-                dpi=300,
-                format="png",
-                bbox_inches="tight",
-            )
-
-        # boxplot for all agents
-        fig = plt.figure(figsize=(25, 3))
-        plt.title("Box plot of agents power")
-        plt.ylabel("Power, in kW")
-        df_p_res.boxplot()
-        plt.xticks(rotation=45, ha="right")
-        fig.get_axes()[0].set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_boxpl.png"),
-            dpi=300,
-            format="png",
-            bbox_inches="tight",
-        )
-
-        # amount of energy and costs
-        amount_e = []
-        amount_e_feedin = []
-        amount_e_demand = []
-        amount_e_gen = []
-        amount_e_cons = []
-        amount_costs = []
-        for name, profile in data_res["p_res"].items():
-            amount_e.append(round(sum(data_res["p_res"][name]) / 4))
-            amount_e_feedin.append(
-                round(sum(val for val in data_res["p_res"][name] if val < 0) / 4)
-            )
-            amount_e_demand.append(
-                round(sum(val for val in data_res["p_res"][name] if val > 0) / 4)
-            )
-            amount_e_cons.append(round(sum(data_res["p_cons"][name]) / 4))
-            amount_e_gen.append(round(sum(data_res["p_gen"][name]) / 4))
-            grid_cost = (
-                sum(
-                    [
-                        p * c
-                        for p, c in zip(
-                            data_res["p_res"][name], data_res["price"][name]
-                        )
-                        if p > 0
-                    ]
-                )
-                / 4
-            )
-            grid_remun = -sum([p * 0.07 for p in data_res["p_res"][name] if p < 0]) / 4
-            amount_costs.append(round(grid_cost - grid_remun))
-
-        fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-        plt.bar(data_res["p_res"].keys(), amount_e, width=0.8)
-        for i, value in enumerate(amount_e):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.ylabel("Energy, in kWh")
-        # plt.ylim((0, max(1.1 * max(amount_e), 1)))
-        plt.xticks(rotation=45, ha="right")
-        ax.set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_energy.png"),
-            dpi=100,
-            format="png",
-            bbox_inches="tight",
-        )
-
-        fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-        plt.bar(data_res["p_res"].keys(), amount_costs, width=0.8)
-        for i, value in enumerate(amount_costs):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.ylabel("Kosten, in EUR")
-        plt.ylim((0, max(1.1 * max(amount_costs), 1)))
-        plt.xticks(rotation=45, ha="right")
-        ax.set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_costs.png"),
-            dpi=300,
-            format="png",
-            bbox_inches="tight",
-        )
-
-        # self-consumption and self-sufficiency
-        sc_ratio = []
-        ss_ratio = []
-        for idx, name in enumerate(data_res["p_res"].keys()):
-            if amount_e_gen[idx] == 0:
-                sc_ratio.append(0)
-            else:
-                sc_ratio.append(
-                    round(
-                        (amount_e_gen[idx] - amount_e_feedin[idx])
-                        / amount_e_gen[idx]
-                        * 100,
-                        1,
-                    )
-                )
-            ss_ratio.append(
-                round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 1)
-            )
-        fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-        plt.bar(data_res["p_res"].keys(), sc_ratio, width=0.8)
-        for i, value in enumerate(sc_ratio):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.ylabel("Self-consumption, in %")
-        plt.ylim((0, max(1.1 * max(sc_ratio), 1)))
-        plt.xticks(rotation=45, ha="right")
-        ax.set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_sc.png"),
-            dpi=100,
-            format="png",
-            bbox_inches="tight",
-        )
-        fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-        plt.bar(data_res["p_res"].keys(), ss_ratio, width=0.8)
-        for i, value in enumerate(ss_ratio):
-            plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.ylabel("Self-sufficiency, in %")
-        plt.ylim((0, max(1.1 * max(ss_ratio), 1)))
-        plt.xticks(rotation=45, ha="right")
-        ax.set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_ss.png"),
-            dpi=100,
-            format="png",
-            bbox_inches="tight",
-        )
-
-        # printing of statistics
-        mean_energy = round(sum(amount_e) / len(amount_e), 1)
-        mean_cost = round(sum(amount_costs) / len(amount_costs), 1)
-        mean_sc = round(sum(sc_ratio) / len(sc_ratio), 1)
-        mean_ss = round(sum(ss_ratio) / len(ss_ratio), 1)
-        print(
-            f"AGENTS: MeanE {mean_energy} kWh , MeanC {mean_cost} EUR , MeanSC {mean_sc} "
-            f", MeanSS {mean_ss}"
-        )
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
+    plt.bar(res_dict.keys(), list_ss, width=0.8)
+    for i, value in enumerate(list_ss):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    plt.ylabel("average self-sufficiency, in %")
+    plt.ylim((0, max(1.1 * max(list_ss), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "agent_ss_avg.png"), dpi=300, format="png"
+    )
 
 
 def main():
@@ -374,8 +220,12 @@ def main():
         print("Need to specify the simulation results to compare.")
         return
 
-    if not os.path.isdir(os.path.join("outputs", "comp")):
-        os.makedirs(os.path.join("outputs", "comp"))
+    dir_path = os.path.join("outputs", "comp")
+    # delete directory if already existent
+    if os.path.exists(dir_path) and os.path.isdir(dir_path):
+        os.rmdir(dir_path)  # shutil.rmtree(directory_path)
+    # create directory anew
+    os.makedirs(dir_path)
 
     print("#########################################")
     print("### Comparing results for simulations ###")
@@ -400,7 +250,7 @@ def main():
         )
 
     print(f"Compare Sim Results for Buses: ...")
-    # comp_results_bus(sim_res["bus"])
+    comp_results_bus(sim_res["bus"])
     print(f"Done!")
 
     print(f"Compare Sim Results for Lines: ...")
@@ -408,7 +258,7 @@ def main():
     print(f"Done!")
 
     print(f"Compare Sim Results for Agents: ...")
-    # comp_results_agents(sim_res["agents"])
+    comp_results_agents(sim_res["agents"])
     print(f"Done!")
 
 
