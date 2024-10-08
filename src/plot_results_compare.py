@@ -10,6 +10,11 @@ from plot_results import get_line_load, get_vm_pu, get_agents_res
 # import matplotlib.dates as mdates
 # import copy
 
+GRAN = 96
+DAY_START = 0.3
+DAY_END = 17
+IDX_DAYS_PLOT = [int(GRAN * DAY_START), int(GRAN * DAY_END)]
+
 
 def timesteps_to_datetime(timesteps_np: np.ndarray) -> np.datetime64:
     time_delta = np.timedelta64(900, "s") * timesteps_np
@@ -77,6 +82,18 @@ def comp_results_line(res_dict):
         dpi=300,
         format="png",
         bbox_inches="tight",
+    )
+
+    fig = plt.figure(figsize=(10, 4))
+    for name, res_sim in res_dict.items():
+        plt.plot(res_sim["df"]["trafo 1"], label=name)
+    plt.xlabel("Time")
+    plt.ylabel("Transformer loading, in %")
+    plt.xlim(IDX_DAYS_PLOT[0], IDX_DAYS_PLOT[1])
+    plt.legend()
+    fig.get_axes()[0].set_rasterized(True)
+    plt.savefig(
+        os.path.join("outputs", "comp", "line_load_profile.png"), dpi=300, format="png"
     )
 
 
