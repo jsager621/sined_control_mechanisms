@@ -229,8 +229,8 @@ def get_vm_pu(vm_pu_file) -> dict:
 
         res_dict["num_ovl_up_list"] = n_up_list
         res_dict["num_ovl_lw_list"] = n_lw_list
-        res_dict["ovl_sum_ov"] = sum_vm_ov
-        res_dict["ovl_sum_lw"] = sum_vm_un
+        res_dict["ovl_sum_ov"] = round(sum_vm_ov, 4)
+        res_dict["ovl_sum_lw"] = round(sum_vm_un, 4)
 
         res_dict["max_val"] = round(res_dict["df"].max().max(), 4)
         res_dict["min_val"] = round(res_dict["df"].min().min(), 4)
