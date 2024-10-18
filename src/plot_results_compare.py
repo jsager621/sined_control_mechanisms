@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import json
 import numpy as np
@@ -11,8 +12,8 @@ from plot_results import get_line_load, get_vm_pu, get_agents_res
 # import copy
 
 GRAN = 96
-DAY_START = 0.3
-DAY_END = 17
+DAY_START = 6.3
+DAY_END = 8.7
 IDX_DAYS_PLOT = [int(GRAN * DAY_START), int(GRAN * DAY_END)]
 
 
@@ -58,7 +59,7 @@ def comp_results_line(res_dict):
     plt.bar(res_dict.keys(), list_violations, width=0.8)
     for i, value in enumerate(list_violations):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
-    plt.ylabel("number of violated steps")
+    plt.ylabel("number of violated steps with overload")
     plt.ylim((0, max(1.1 * max(list_violations), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
@@ -84,6 +85,7 @@ def comp_results_line(res_dict):
         bbox_inches="tight",
     )
 
+    # profile for exemplary day
     fig = plt.figure(figsize=(10, 4))
     for name, res_sim in res_dict.items():
         plt.plot(res_sim["df"]["trafo 1"], label=name)
@@ -106,12 +108,17 @@ def comp_results_bus(res_dict):
         list_min_val.append(res_sim["min_val"])
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
-    plt.bar(res_dict.keys(), list_max_val, bottom=list_min_val, width=0.8)
+    plt.bar(
+        res_dict.keys(),
+        [list_max_val[i] - list_min_val[i] for i in range(len(list_max_val))],
+        bottom=list_min_val,
+        width=0.8,
+    )
     for i, value in enumerate(list_max_val):
-        plt.text(i, value + 1, str(value), ha="center", va="bottom")
-        plt.text(i, list_min_val[i] - 1, str(list_min_val[i]), ha="center", va="top")
+        plt.text(i, value + 0.01, str(value), ha="center", va="bottom")
+        plt.text(i, list_min_val[i] - 0.01, str(list_min_val[i]), ha="center", va="top")
     plt.ylabel("value range for bus voltage magnitude, in p.u.")
-    plt.ylim((0, max(1.1 * max(list_max_val), 100)))
+    plt.ylim((min(0.9 * min(list_min_val), 0.99), max(1.1 * max(list_max_val), 1.01)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -139,7 +146,7 @@ def comp_results_bus(res_dict):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
     for i, value in enumerate(list_vio_low):
         plt.text(i, value - 1, str(value), ha="center", va="top")
-    plt.ylabel("number of violated steps")
+    plt.ylabel("number of violated steps with voltage")
     plt.ylim((min(1.1 * min(list_vio_low), -1), max(1.1 * max(list_vio_up), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
@@ -152,13 +159,13 @@ def comp_results_bus(res_dict):
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ovl_sum_up, width=0.8)
-    plt.bar(res_dict.keys(), list_ovl_sum_lw, width=0.8)
+    plt.bar(res_dict.keys(), [-val for val in list_ovl_sum_lw], width=0.8)
     for i, value in enumerate(list_ovl_sum_up):
-        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+        plt.text(i, value + 0.1, str(value), ha="center", va="bottom")
     for i, value in enumerate(list_ovl_sum_lw):
-        plt.text(i, value - 1, str(value), ha="center", va="top")
+        plt.text(i, -value - 0.1, str(-value), ha="center", va="top")
     plt.ylabel("bus sum voltage limit violation, in p.u.")
-    plt.ylim((min(1.1 * min(list_ovl_sum_lw), -1), max(1.1 * max(list_ovl_sum_up), 1)))
+    plt.ylim((min(-1.1 * max(list_ovl_sum_lw), -1), max(1.1 * max(list_ovl_sum_up), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -186,7 +193,7 @@ def comp_results_agents(res_dict):
     for i, value in enumerate(list_energy):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
     plt.ylabel("average energy, in kWh")
-    plt.ylim((0, max(1.1 * max(list_energy), 1)))
+    plt.ylim((0.98 * min(list_energy), max(1.05 * max(list_energy), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -198,7 +205,7 @@ def comp_results_agents(res_dict):
     for i, value in enumerate(list_cost):
         plt.text(i, value + 1, str(value), ha="center", va="bottom")
     plt.ylabel("average costs, in EUR")
-    plt.ylim((0, max(1.1 * max(list_cost), 1)))
+    plt.ylim((0.98 * min(list_cost), max(1.05 * max(list_cost), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -208,9 +215,9 @@ def comp_results_agents(res_dict):
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_sc, width=0.8)
     for i, value in enumerate(list_sc):
-        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+        plt.text(i, value + 0.1, str(value), ha="center", va="bottom")
     plt.ylabel("average self-consumption, in %")
-    plt.ylim((0, max(1.1 * max(list_sc), 1)))
+    plt.ylim((min(list_sc) - 0.5, max(max(list_sc) + 1, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -220,14 +227,49 @@ def comp_results_agents(res_dict):
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ss, width=0.8)
     for i, value in enumerate(list_ss):
-        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+        plt.text(i, value + 0.1, str(value), ha="center", va="bottom")
     plt.ylabel("average self-sufficiency, in %")
-    plt.ylim((0, max(1.1 * max(list_ss), 1)))
+    plt.ylim((min(list_ss) - 0.5, max(max(list_ss) + 1, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
         os.path.join("outputs", "comp", "agent_ss_avg.png"), dpi=300, format="png"
     )
+
+
+def comp_results_table(sim_res):
+    column_names = [
+        "Max. Line loading, in %",
+        "Min. Line Loading, in %",
+        "#Ovl loading",
+        "Sum overload work, in kWh",
+        "Max. Voltage, in p.u.",
+        "Min. Voltage, in p.u.",
+        "#Ovl voltage upper",
+        "#Ovl voltage lower",
+        "Sum over-voltage, in p.u.",
+        "Sum under-voltage, in p.u.",
+        "Avrg. Energy Prosumer, in kWh",
+        "Avrg. Cost Prosumer, in EUR",
+        "Avrg. Self-consumption Prosumer, in %",
+        "Avrg. Self-sufficiency Prosumer, in %",
+    ]
+    index_names = list(sim_res["bus"].keys())
+    df_res = pd.DataFrame(columns=column_names, index=index_names)
+    df_res.loc[df_res.columns[0]] = [None for x in range(len(column_names))]
+
+    # insert line results
+    for sim_name, res_dict in sim_res["line"].items():
+        df_res.at[sim_name, "Max. Line loading, in %"] = res_dict["max_val"]
+        df_res.at[sim_name, "Min. Line loading, in %"] = res_dict["min_val"]
+        df_res.at[sim_name, "#Ovl loading"] = res_dict["num_ovl_sum"]
+        df_res.at[sim_name, "Sum overload work, in kWh"] = res_dict["ovl_work_kWh"]
+
+    # insert bus results
+
+    # insert agent results
+
+    df_res.to_excel(os.path.join("outputs", "comp", "table.xlsx"))
 
 
 def main():
@@ -240,7 +282,11 @@ def main():
     dir_path = os.path.join("outputs", "comp")
     # delete directory if already existent
     if os.path.exists(dir_path) and os.path.isdir(dir_path):
-        os.rmdir(dir_path)  # shutil.rmtree(directory_path)
+        try:
+            os.rmdir(dir_path)
+        except:
+            shutil.rmtree(dir_path)
+            # os.rmdir(dir_path)
     # create directory anew
     os.makedirs(dir_path)
 
@@ -276,6 +322,10 @@ def main():
 
     print(f"Compare Sim Results for Agents: ...")
     comp_results_agents(sim_res["agents"])
+    print(f"Done!")
+
+    print(f"Create Overview Table for Sim Results: ...")
+    comp_results_table(sim_res)
     print(f"Done!")
 
 
