@@ -259,25 +259,85 @@ def plot_agents(agents_file, rundir, days):
             bbox_inches="tight",
         )
 
-        # boxplot for all agents
-        fig = plt.figure(figsize=(25, 3))
-        plt.title("Box plot of agents power")
-        plt.ylabel("Power, in kW")
-        agents_res["df"].boxplot()
-        plt.xticks(rotation=45, ha="right")
-        fig.get_axes()[0].set_rasterized(True)
-        plt.savefig(
-            os.path.join(rundir, "agents_boxpl.png"),
-            dpi=300,
-            format="png",
-            bbox_inches="tight",
-        )
+    # boxplot for all agents
+    fig = plt.figure(figsize=(25, 3))
+    plt.title("Box plot of agents power")
+    plt.ylabel("Power, in kW")
+    agents_res["df"].boxplot()
+    plt.xticks(rotation=45, ha="right")
+    fig.get_axes()[0].set_rasterized(True)
+    plt.savefig(
+        os.path.join(rundir, "agents_boxpl.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
 
-        # printing of statistics
-        print(
-            f"AGENTS: MeanE {agents_res['mean_energy']} kWh , MeanC {agents_res['mean_cost']} EUR"
-            f", MeanSC {agents_res['mean_sc']}, MeanSS {agents_res['mean_ss']}"
+    # Energy sums of agents
+    fig, ax = plt.subplots(layout="constrained", figsize=(15, 4))
+    plt.bar(agents_res["df"].keys(), agents_res["amount_e_list"], width=0.8)
+    for i, value in enumerate(agents_res["amount_e_list"]):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    plt.ylabel("Energy, in kWh")
+    # plt.ylim((0, max(1.1 * max(amount_e), 1)))
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join(rundir, "agents_energy.png"),
+        dpi=100,
+        format="png",
+        bbox_inches="tight",
+    )
+    fig, ax = plt.subplots(layout="constrained", figsize=(15, 4))
+    plt.bar(agents_res["df"].keys(), agents_res["amount_edemand_list"], width=0.8)
+    plt.bar(agents_res["df"].keys(), agents_res["amount_efeedin_list"], width=0.8)
+    for i, value in enumerate(agents_res["amount_edemand_list"]):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    for i, value in enumerate(agents_res["amount_efeedin_list"]):
+        plt.text(i, value - 1, str(value), ha="center", va="bottom")
+    plt.ylabel("Energy demanded from/fed into grid, in kWh")
+    plt.ylim(
+        (
+            min(1.1 * min(agents_res["amount_efeedin_list"]), -1),
+            max(1.1 * max(agents_res["amount_edemand_list"]), 1),
         )
+    )
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join(rundir, "agents_energy_sep.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
+    fig, ax = plt.subplots(layout="constrained", figsize=(15, 4))
+    plt.bar(agents_res["df"].keys(), agents_res["amount_e_cons"], width=0.8)
+    plt.bar(agents_res["df"].keys(), agents_res["amount_e_gen"], width=0.8)
+    for i, value in enumerate(agents_res["amount_e_cons"]):
+        plt.text(i, value + 1, str(value), ha="center", va="bottom")
+    for i, value in enumerate(agents_res["amount_e_gen"]):
+        plt.text(i, value - 1, str(value), ha="center", va="bottom")
+    plt.ylabel("Energy consumed/generated, in kWh")
+    plt.ylim(
+        (
+            min(1.1 * min(agents_res["amount_e_gen"]), -1),
+            max(1.1 * max(agents_res["amount_e_cons"]), 1),
+        )
+    )
+    plt.xticks(rotation=45, ha="right")
+    ax.set_rasterized(True)
+    plt.savefig(
+        os.path.join(rundir, "agents_energy_sep_test.png"),
+        dpi=300,
+        format="png",
+        bbox_inches="tight",
+    )
+
+    # printing of statistics
+    print(
+        f"AGENTS: MeanE {agents_res['mean_energy']} kWh , MeanC {agents_res['mean_cost']} EUR"
+        f", MeanSC {agents_res['mean_sc']}, MeanSS {agents_res['mean_ss']}"
+    )
 
 
 def get_agents_res(agents_file):
@@ -352,6 +412,11 @@ def get_agents_res(agents_file):
                 round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 1)
             )
 
+        res_dict["amount_e_list"] = amount_e
+        res_dict["amount_efeedin_list"] = amount_e_feedin
+        res_dict["amount_edemand_list"] = amount_e_demand
+        res_dict["amount_e_cons"] = amount_e_cons
+        res_dict["amount_e_gen"] = amount_e_gen
         res_dict["mean_energy"] = round(sum(amount_e) / len(amount_e), 2)
         res_dict["mean_cost"] = round(sum(amount_costs) / len(amount_costs), 2)
         res_dict["mean_sc"] = round(sum(sc_ratio) / len(sc_ratio), 2)
