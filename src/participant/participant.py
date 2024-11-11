@@ -100,6 +100,10 @@ class NetParticipant(Agent):
             else 0
         )
 
+        print(
+            f"Agent NR {self.agent_nr} --- PV: {self.dev['pv']} - BSS: {self.dev['bss']} - CS: {self.dev['cs']} - EV: {self.dev['ev']} - HP: {self.dev['hp']}"
+        )
+
         self.e_level_save = {}
         self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
         self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
@@ -274,8 +278,13 @@ class NetParticipant(Agent):
         self.schedule_log[timestamp] = {
             "price": schedule["price"],
             "p_res": schedule["p_res"],
-            "p_cons": schedule["load"] + schedule["hp"] + ev_cha + bss_cha,
-            "p_gen": schedule["pv"] + bss_discha + ev_discha,
+            "p_cons": schedule["load"]
+            + schedule["hp"]
+            + ev_cha
+            - ev_discha
+            + bss_cha
+            - bss_discha,
+            "p_gen": schedule["pv"],
         }
 
     def run(self):
