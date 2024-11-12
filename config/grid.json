@@ -1,6 +1,6 @@
 {
     "GRID": "kerber_dorfnetz",
-    "CONTROL_TYPE": "limits",
+    "CONTROL_TYPE": "none",
     "CONFIG_CONTROL": {
         "MAX_NUM_LOOPS": 1,
         "P_MAX_INIT_kW": 12,
@@ -10,7 +10,7 @@
         "TARIFF_ADJ": 0.03,
         "PEAK_PRICE_DEM": 0.02,
         "PEAK_PRICE_GEN": 0.02,
-        "COND_POWER_THRESHOLD_kW": 6,
+        "COND_POWER_THRESHOLD_kW": 8,
         "COND_POWER_ADD_COSTS": 0.05
     },
     "NUM_HOUSEHOLDS": 57,
@@ -18,6 +18,5 @@
     "R_PV": 0.86,
     "R_EV": 1,
     "R_BSS": 0.35,
-    "R_CS": 1,
     "R_HP": 1
 }

@@ -39,7 +39,6 @@ async def create_agents_and_containers(grid_config):
     r_pv = grid_config["R_PV"]
     r_ev = grid_config["R_EV"]
     r_bss = grid_config["R_BSS"]
-    r_cs = grid_config["R_CS"]
     r_hp = grid_config["R_HP"]
 
     # make bool lists with ratio amount of true values
@@ -48,13 +47,11 @@ async def create_agents_and_containers(grid_config):
     pv = [i < r_pv * n_participants for i in range(n_participants)]
     ev = [i < r_ev * n_participants for i in range(n_participants)]
     bss = [i < r_bss * n_participants for i in range(n_participants)]
-    cs = [i < r_cs * n_participants for i in range(n_participants)]
     hp = [i < r_hp * n_participants for i in range(n_participants)]
 
     random.shuffle(pv)
     random.shuffle(ev)
     random.shuffle(bss)
-    random.shuffle(cs)
     random.shuffle(hp)
 
     participants = []
@@ -65,7 +62,7 @@ async def create_agents_and_containers(grid_config):
                 has_pv=pv[i],
                 has_ev=ev[i],
                 has_bss=pv[i] and bss[i],
-                has_cs=cs[i],
+                has_cs=ev[i],
                 has_hp=hp[i],
             )
         )

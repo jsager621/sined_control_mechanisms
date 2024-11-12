@@ -109,6 +109,7 @@ class NetParticipant(Agent):
         self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
 
         # initialize residual schedule of the day with zeros for each value
+        self.forecasts = {}
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
         # NOTE positive values are power demand, negative values are generation
 
@@ -141,6 +142,7 @@ class NetParticipant(Agent):
         sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
         if isinstance(content, TimeStepMessage):
+            self.forecasts = {}
             c_id = content.c_id
             self.compute_time_step(content.time)
 
@@ -247,11 +249,12 @@ class NetParticipant(Agent):
         return forecasts
 
     def compute_day_ahead_schedule(self, timestamp):
-        forecasts = self.read_forecast_data(timestamp=timestamp)
+        if self.forecasts == {}:  # retrieve forecast for next day if not already there
+            self.forecasts = self.read_forecast_data(timestamp=timestamp)
 
         # compute schedule for upcoming day
         schedule = calc_opt_day(
-            forecasts=forecasts,
+            forecasts=self.forecasts,
             pv_vals=self.dev["pv"],
             bss_vals=self.dev["bss"],
             cs_vals=self.dev["cs"],
