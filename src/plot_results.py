@@ -378,20 +378,25 @@ def get_agents_res(agents_file):
             amount_e_demand.append(round(sum(val for val in profile if val > 0) / 4))
             amount_e_cons.append(round(sum(data_res["p_cons"][name]) / 4))
             amount_e_gen.append(round(sum(data_res["p_gen"][name]) / 4))
-            grid_cost = (
-                sum(
-                    [
-                        p * c
-                        for p, c in zip(
-                            data_res["p_res"][name], data_res["price"][name]
-                        )
-                        if p > 0
-                    ]
+            if "cost_sum" in data_res:
+                amount_costs.append(round(sum(data_res["cost_sum"][name])))
+            else:
+                grid_cost = (
+                    sum(
+                        [
+                            p * c
+                            for p, c in zip(
+                                data_res["p_res"][name], data_res["price"][name]
+                            )
+                            if p > 0
+                        ]
+                    )
+                    / 4
                 )
-                / 4
-            )
-            grid_remun = -sum([p * 0.07 for p in data_res["p_res"][name] if p < 0]) / 4
-            amount_costs.append(round(grid_cost - grid_remun))
+                grid_remun = (
+                    -sum([p * 0.07 for p in data_res["p_res"][name] if p < 0]) / 4
+                )
+                amount_costs.append(round(grid_cost - grid_remun))
 
         # self-consumption and self-sufficiency
         sc_ratio = []

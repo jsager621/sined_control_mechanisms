@@ -288,6 +288,7 @@ class NetParticipant(Agent):
             + bss_cha
             - bss_discha,
             "p_gen": schedule["pv"],
+            "cost_sum": schedule["cost_sum"],
         }
 
     def run(self):
@@ -558,6 +559,14 @@ def calc_opt_day(
             model.x_grid_feedin[:](), 4
         )
         profiles["price"] = elec_price
+
+        # retrieve costs for participant from schedule
+        profiles["cost_sum"] = np.round(
+            obj_el_costs()
+            + c_peak_dem * model.x_p_peak_load[0]()
+            + c_peak_gen * model.x_p_peak_gen[0](),
+            3,
+        )
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message
