@@ -100,11 +100,16 @@ class NetParticipant(Agent):
             else 0
         )
 
+        print(
+            f"Agent NR {self.agent_nr} --- PV: {self.dev['pv']} - BSS: {self.dev['bss']} - CS: {self.dev['cs']} - EV: {self.dev['ev']} - HP: {self.dev['hp']}"
+        )
+
         self.e_level_save = {}
         self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
         self.max_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["max"]
 
         # initialize residual schedule of the day with zeros for each value
+        self.forecasts = {}
         self.residual_schedule = np.zeros(int(3600 * 24 / self.step_size_s))
         # NOTE positive values are power demand, negative values are generation
 
@@ -137,6 +142,7 @@ class NetParticipant(Agent):
         sender = AgentAddress(sender_addr[0], sender_addr[1], sender_id)
 
         if isinstance(content, TimeStepMessage):
+            self.forecasts = {}
             c_id = content.c_id
             self.compute_time_step(content.time)
 
@@ -243,11 +249,12 @@ class NetParticipant(Agent):
         return forecasts
 
     def compute_day_ahead_schedule(self, timestamp):
-        forecasts = self.read_forecast_data(timestamp=timestamp)
+        if self.forecasts == {}:  # retrieve forecast for next day if not already there
+            self.forecasts = self.read_forecast_data(timestamp=timestamp)
 
         # compute schedule for upcoming day
         schedule = calc_opt_day(
-            forecasts=forecasts,
+            forecasts=self.forecasts,
             pv_vals=self.dev["pv"],
             bss_vals=self.dev["bss"],
             cs_vals=self.dev["cs"],
@@ -274,8 +281,14 @@ class NetParticipant(Agent):
         self.schedule_log[timestamp] = {
             "price": schedule["price"],
             "p_res": schedule["p_res"],
-            "p_cons": schedule["load"] + schedule["hp"] + ev_cha + bss_cha,
-            "p_gen": schedule["pv"] + bss_discha + ev_discha,
+            "p_cons": schedule["load"]
+            + schedule["hp"]
+            + ev_cha
+            - ev_discha
+            + bss_cha
+            - bss_discha,
+            "p_gen": schedule["pv"],
+            "cost_sum": schedule["cost_sum"],
         }
 
     def run(self):
@@ -546,6 +559,14 @@ def calc_opt_day(
             model.x_grid_feedin[:](), 4
         )
         profiles["price"] = elec_price
+
+        # retrieve costs for participant from schedule
+        profiles["cost_sum"] = np.round(
+            obj_el_costs()
+            + c_peak_dem * model.x_p_peak_load[0]()
+            + c_peak_gen * model.x_p_peak_gen[0](),
+            3,
+        )
     else:
         raise ValueError(
             "Schedule Optimization unsuccessful: " + result.solver.termination_message
