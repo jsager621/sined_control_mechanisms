@@ -33,6 +33,7 @@
         
         - MAX_NUM_LOOPS >1, should be around 5, as congested time steps are continuously added to list of adjusted tariff steps
         - TARIFF_ADJ >0, small value of a couple cents sufficient (typically approx. 0.08 eur/kWh from grid charges, should be below)
+        - TARIFF_ADJ_FEEDIN true/false, whether to apply adjustment for tariff values at schedule timesteps also to feedin tariff or just to the electricity consumption price (false for fixed feedin tariff)
     
     - "limits"
         
