@@ -410,6 +410,8 @@ def calc_opt_day(
     # adjust electricity price list with sent control signals
     if control_sig is not None and isinstance(control_sig.tariff_adj, np.ndarray):
         elec_price = list(elec_price + control_sig.tariff_adj)
+        if control_sig.tariff_adj_feedin:  # check whether to also adjust feedin tariff
+            feedin_tariff = list(feedin_tariff + control_sig.tariff_adj)
     # sum up electricity price and remunderation for grid power of day
     if control_sig.conditional_power_threshold is None:
         # if no conditional power, simply sum up costs for load and remuner. for feedin

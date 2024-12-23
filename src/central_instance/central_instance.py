@@ -279,6 +279,9 @@ class CentralInstance(Agent):
                 self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
             for step in steps_curtail_generation:
                 self.control_signal.tariff_adj[step] = -self.control_conf["TARIFF_ADJ"]
+            self.control_signal.tariff_adj_feedin = self.control_conf[
+                "TARIFF_ADJ_FEEDIN"
+            ]
         elif self.control_type == "limits":
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
