@@ -215,9 +215,9 @@ def comp_results_agents(res_dict):
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_sc, width=0.8)
     for i, value in enumerate(list_sc):
-        plt.text(i, value + 0.1, str(value), ha="center", va="bottom")
+        plt.text(i, value + 0.02, str(value), ha="center", va="bottom")
     plt.ylabel("average self-consumption, in %")
-    plt.ylim((min(list_sc) - 0.5, max(max(list_sc) + 1, 1)))
+    plt.ylim((min(list_sc) - 0.1, max(max(list_sc) + 0.3, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
@@ -227,9 +227,9 @@ def comp_results_agents(res_dict):
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ss, width=0.8)
     for i, value in enumerate(list_ss):
-        plt.text(i, value + 0.1, str(value), ha="center", va="bottom")
+        plt.text(i, value + 0.02, str(value), ha="center", va="bottom")
     plt.ylabel("average self-sufficiency, in %")
-    plt.ylim((min(list_ss) - 0.5, max(max(list_ss) + 1, 1)))
+    plt.ylim((min(list_ss) - 0.1, max(max(list_ss) + 0.3, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
     plt.savefig(
