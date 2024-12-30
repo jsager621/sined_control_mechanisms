@@ -25,6 +25,10 @@ GRID_CONFIG = os.path.join(CONFIG_DIR, "grid.json")
 PROSUMER_CONFIG = os.path.join(CONFIG_DIR, "prosumer.json")
 SIMULATION_CONFIG = os.path.join(CONFIG_DIR, "simulation.json")
 
+ETG_CONF_DIR = os.path.join(CONFIG_DIR, "etg")
+ETG_BASE_GRID_CONF = os.path.join(ETG_CONF_DIR, "base_grid.json")
+ETG_PROSUMER_CONF = os.path.join(ETG_CONF_DIR, "prosumer.json")
+
 
 # Singleton class to ensure csv files are read only once per process
 # regardless of which agents calls for data first.
@@ -151,12 +155,18 @@ def read_json(json_file):
     return data
 
 
-def read_prosumer_config():
-    return read_json(PROSUMER_CONFIG)
+def read_prosumer_config(conf_file=None):
+    if conf_file is None:
+        conf_file = PROSUMER_CONFIG
+
+    return read_json(conf_file)
 
 
-def read_grid_config():
-    return read_json(GRID_CONFIG)
+def read_grid_config(conf_file=None):
+    if conf_file is None:
+        conf_file = GRID_CONFIG
+
+    return read_json(conf_file)
 
 
 def read_simulation_config():

@@ -32,7 +32,7 @@ ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
 
 class NetParticipant(Agent):
-    def __init__(self, container, has_pv, has_ev, has_bss, has_cs, has_hp):
+    def __init__(self, container, has_pv, has_ev, has_bss, has_cs, has_hp, config=read_prosumer_config()):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
 
@@ -56,7 +56,7 @@ class NetParticipant(Agent):
         self.step_size_s = 15 * 60  # 15 min steps, 900 seconds
 
         # read config
-        self.config = read_prosumer_config()
+        self.config = config
         self.tariff = self.config["TARIFF"]
 
         # store data of the devices
