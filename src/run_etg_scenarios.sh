@@ -1,6 +1,5 @@
-# python call: 
-# python run_etg_simulation.py <ctrl_type> <r_pv> <r_bss>
-this_dir=dirname "$(realpath $0)"
+#!/bin/bash
+this_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 for ctrl_type in none tariff limits peak_price conditional_power
 do
