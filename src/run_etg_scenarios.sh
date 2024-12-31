@@ -4,6 +4,9 @@ this_dir=dirname "$(realpath $0)"
 
 for ctrl_type in none tariff limits peak_price conditional_power
 do
+    date +"%F %T"
+    echo starting $ctrl_type
+
     python $this_dir/run_etg_simulation.py $ctrl_type 1 1
     python $this_dir/run_etg_simulation.py $ctrl_type 1 0.66
     python $this_dir/run_etg_simulation.py $ctrl_type 1 0.33
@@ -15,4 +18,7 @@ do
     python $this_dir/run_etg_simulation.py $ctrl_type 0.33 1
     python $this_dir/run_etg_simulation.py $ctrl_type 0.33 0.66
     python $this_dir/run_etg_simulation.py $ctrl_type 0.33 0.33
+
+    date +"%F %T"
+    echo finished $ctrl_type
 done

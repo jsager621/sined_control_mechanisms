@@ -100,9 +100,9 @@ class NetParticipant(Agent):
             else 0
         )
 
-        print(
-            f"Agent NR {self.agent_nr} --- PV: {self.dev['pv']} - BSS: {self.dev['bss']} - CS: {self.dev['cs']} - EV: {self.dev['ev']} - HP: {self.dev['hp']}"
-        )
+        # print(
+        #     f"Agent NR {self.agent_nr} --- PV: {self.dev['pv']} - BSS: {self.dev['bss']} - CS: {self.dev['cs']} - EV: {self.dev['ev']} - HP: {self.dev['hp']}"
+        # )
 
         self.e_level_save = {}
         self.min_peak_load = self.config["HOUSEHOLD"]["peak_load_kW"]["min"]
