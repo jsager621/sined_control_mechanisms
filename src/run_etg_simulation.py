@@ -80,7 +80,7 @@ async def create_agents_and_containers(grid_config, prosumer_config):
         ]
     # print(df_part)
 
-    central_instance = CentralInstance(c)
+    central_instance = CentralInstance(c, grid_config)
     agents = participants + [central_instance]
 
     agent_addresses = [a.get_address() for a in agents]

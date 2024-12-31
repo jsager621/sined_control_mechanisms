@@ -27,12 +27,12 @@ class CentralInstance(Agent):
     BUS_LV_VM_MAX = 1.05
     LINE_LV_LOAD_MAX = 100
 
-    def __init__(self, container):
+    def __init__(self, container, grid_config=read_grid_config()):
         # We must pass a reference of the container to "mango.Agent":
         super().__init__(container)
 
         # read config
-        self.grid_config = read_grid_config()
+        self.grid_config = grid_config
 
         # store length of one simulation step
         self.step_size_s = 15 * 60  # 15 min steps, 900 seconds
