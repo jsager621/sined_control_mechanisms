@@ -7,11 +7,14 @@
         "P_MAX_STEP_kW": -2,
         "P_MIN_INIT_kW": -12,
         "P_MIN_STEP_kW": 2,
-        "TARIFF_ADJ": 0.03,
+        "TARIFF_ADJ": 0.02,
+        "TARIFF_ADJ_FEEDIN": true,
         "PEAK_PRICE_DEM": 0.02,
         "PEAK_PRICE_GEN": 0.02,
+        "PEAK_PRICE_SEND_ALWAYS": false,
         "COND_POWER_THRESHOLD_kW": 8,
-        "COND_POWER_ADD_COSTS": 0.05
+        "COND_POWER_ADD_COSTS": 0.05,
+        "COND_POWER_SEND_ALWAYS": false
     },
     "NUM_HOUSEHOLDS": 57,
     "NUM_PARTICIPANTS": 57,

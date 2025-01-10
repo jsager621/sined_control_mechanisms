@@ -410,11 +410,11 @@ def get_agents_res(agents_file):
                         (amount_e_gen[idx] - amount_e_feedin[idx])
                         / amount_e_gen[idx]
                         * 100,
-                        1,
+                        4,
                     )
                 )
             ss_ratio.append(
-                round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 1)
+                round(100 - (amount_e_demand[idx] / amount_e_cons[idx]) * 100, 4)
             )
 
         res_dict["amount_e_list"] = amount_e
@@ -424,8 +424,8 @@ def get_agents_res(agents_file):
         res_dict["amount_e_gen"] = amount_e_gen
         res_dict["mean_energy"] = round(sum(amount_e) / len(amount_e), 2)
         res_dict["mean_cost"] = round(sum(amount_costs) / len(amount_costs), 2)
-        res_dict["mean_sc"] = round(sum(sc_ratio) / len(sc_ratio), 2)
-        res_dict["mean_ss"] = round(sum(ss_ratio) / len(ss_ratio), 2)
+        res_dict["mean_sc"] = round(sum(sc_ratio) / len(sc_ratio), 4)
+        res_dict["mean_ss"] = round(sum(ss_ratio) / len(ss_ratio), 4)
 
     return res_dict
 
