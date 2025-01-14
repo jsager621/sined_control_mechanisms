@@ -47,6 +47,7 @@ def i_to_scenario(i):
 
 def make_v_step_plot(i_low, i_high, v_step_up, v_step_low, order=False):
     sns.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
+    sns.set(font_scale=1.4)
     # parse data around a bit:
     # build a table with columns:
     # SCENARIO, MECHANISM, v_step_up, v_step_low
@@ -87,6 +88,8 @@ def make_v_step_plot(i_low, i_high, v_step_up, v_step_low, order=False):
             legend=False,
             order=["Conditional Power 4kW", "Conditional Power 6kW", "Conditional Power 8kW", "Conditional Power 10kW"]
         )
+
+        sns.move_legend(g, "upper left")
     else:
         g = sns.barplot(
         data=df,
@@ -105,6 +108,8 @@ def make_v_step_plot(i_low, i_high, v_step_up, v_step_low, order=False):
             legend=False
         )
 
+        sns.move_legend(g, "upper center")
+
     for i in g.containers:
         g.bar_label(i,)
 
@@ -114,14 +119,13 @@ def make_v_step_plot(i_low, i_high, v_step_up, v_step_low, order=False):
     # g.despine(left=True)
     g.set_xlabel("Mechanism")
     g.set_ylabel("Number of voltage violations")
-    sns.move_legend(g, "upper center")
     # g.set_axis_labels("Mechanism", "Number of voltage violations")
     # g.legend.set_title("")
 
     g.figure.set_size_inches(20,12)
 
     plt.savefig(
-        os.path.join(PLOT_DIR, f"voltage_steps_{i_low}_{i_high}"),
+        os.path.join(PLOT_DIR, f"voltage_steps_{i_low}_{i_high}.png"),
         dpi=300,
         format="png",
         bbox_inches="tight",
@@ -131,6 +135,7 @@ def make_v_step_plot(i_low, i_high, v_step_up, v_step_low, order=False):
 
 def make_v_mag_plot(i_low, i_high, v_mag_up, v_mag_low, order=False):
     sns.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
+    sns.set(font_scale=1.4)
     # parse data around a bit:
     # build a table with columns:
     # SCENARIO, MECHANISM, v_mag_up, v_mag_low
@@ -206,7 +211,7 @@ def make_v_mag_plot(i_low, i_high, v_mag_up, v_mag_low, order=False):
     g.figure.set_size_inches(20,12)
 
     plt.savefig(
-        os.path.join(PLOT_DIR, f"voltage_mag_{i_low}_{i_high}"),
+        os.path.join(PLOT_DIR, f"voltage_mag_{i_low}_{i_high}.png"),
         dpi=300,
         format="png",
         bbox_inches="tight",
@@ -216,6 +221,7 @@ def make_v_mag_plot(i_low, i_high, v_mag_up, v_mag_low, order=False):
 
 def make_line_step_plot(i_low, i_high, line_vio_step, order=False):
     sns.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
+    sns.set(font_scale=1.4)
     # parse data around a bit:
     # build a table with columns:
     # SCENARIO, MECHANISM, line_vio_step
@@ -244,6 +250,7 @@ def make_line_step_plot(i_low, i_high, line_vio_step, order=False):
         hue="scenario",
         order=["Conditional Power 4kW", "Conditional Power 6kW", "Conditional Power 8kW", "Conditional Power 10kW"]
         )
+        sns.move_legend(g, "upper left")
     else:
         g = sns.barplot(
             data=df,
@@ -252,6 +259,7 @@ def make_line_step_plot(i_low, i_high, line_vio_step, order=False):
             y="line_vio_step",
             hue="scenario"
         )
+        sns.move_legend(g, "upper center")
 
     for i in g.containers:
         g.bar_label(i,)
@@ -262,14 +270,14 @@ def make_line_step_plot(i_low, i_high, line_vio_step, order=False):
     # g.despine(left=True)
     g.set_xlabel("Mechanism")
     g.set_ylabel("Number of line limit violations")
-    sns.move_legend(g, "upper center")
+    
     # g.set_axis_labels("Mechanism", "Number of voltage violations")
     # g.legend.set_title("")
 
     g.figure.set_size_inches(20,12)
 
     plt.savefig(
-        os.path.join(PLOT_DIR, f"line_steps_{i_low}_{i_high}"),
+        os.path.join(PLOT_DIR, f"line_steps_{i_low}_{i_high}.png"),
         dpi=300,
         format="png",
         bbox_inches="tight",
@@ -279,6 +287,7 @@ def make_line_step_plot(i_low, i_high, line_vio_step, order=False):
 
 def make_line_mag_plot(i_low, i_high, line_vio_mag, order=False):
     sns.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
+    sns.set(font_scale=1.4)
     # parse data around a bit:
     # build a table with columns:
     # SCENARIO, MECHANISM, line_vio_mag
@@ -298,7 +307,6 @@ def make_line_mag_plot(i_low, i_high, line_vio_mag, order=False):
     )
 
     # df.plot(kind='bar', stacked=True)
-    sns.set(font_scale=1.2)
 
     # order parameter to hard code weird order from conditional power
     if order:
@@ -335,7 +343,7 @@ def make_line_mag_plot(i_low, i_high, line_vio_mag, order=False):
     g.figure.set_size_inches(20,12)
 
     plt.savefig(
-        os.path.join(PLOT_DIR, f"line_mag_{i_low}_{i_high}"),
+        os.path.join(PLOT_DIR, f"line_mag_{i_low}_{i_high}.png"),
         dpi=300,
         format="png",
         bbox_inches="tight",
