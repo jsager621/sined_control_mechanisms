@@ -15,6 +15,9 @@ GRAN = 96
 DAY_START = 6.3
 DAY_END = 8.7
 IDX_DAYS_PLOT = [int(GRAN * DAY_START), int(GRAN * DAY_END)]
+print(IDX_DAYS_PLOT)
+
+IDX_DAYS_PLOT = [0, 96 * 7]
 
 
 def timesteps_to_datetime(timesteps_np: np.ndarray) -> np.datetime64:
@@ -272,6 +275,48 @@ def comp_results_table(sim_res):
     df_res.to_excel(os.path.join("outputs", "comp", "table.xlsx"))
 
 
+def data_to_json(res_dict_bus, res_dict_line):
+    # voltage data we are interested in
+    list_vio_up = []
+    list_vio_low = []
+    list_ovl_sum_up = []
+    list_ovl_sum_lw = []
+    for name, res_sim in res_dict_bus.items():
+        list_vio_up.append(sum(res_sim["num_ovl_up_list"]))
+        list_vio_low.append(sum(res_sim["num_ovl_lw_list"]))
+        list_ovl_sum_up.append(res_sim["ovl_sum_ov"])
+        list_ovl_sum_lw.append(res_sim["ovl_sum_lw"])
+
+    # line limit data we are interested in
+    list_violations = []
+    list_ovl_work = []
+    for name, res_sim in res_dict_line.items():
+        list_violations.append(res_sim["num_ovl_sum"])
+        list_ovl_work.append(res_sim["ovl_work_kWh"])
+
+    # # price data just for fun
+    # list_energy = []
+    # list_cost = []
+    # list_sc = []
+    # list_ss = []
+    # for name, res_sim in res_dict_agent.items():
+    #     list_energy.append(res_sim["mean_energy"])
+    #     list_cost.append(res_sim["mean_cost"])
+    #     list_sc.append(res_sim["mean_sc"])
+    #     list_ss.append(res_sim["mean_ss"])
+
+    out_dict = {
+        "v_step_up": list_vio_up,
+        "v_step_low": list_vio_low,
+        "v_mag_up": list_ovl_sum_up,
+        "v_mag_low": list_ovl_sum_lw,
+        "line_vio_step": list_violations,
+        "line_vio_mag": list_ovl_work
+    }
+
+    print(out_dict)
+
+
 def main():
     day = 0
 
@@ -311,6 +356,10 @@ def main():
         sim_res["agents"][sim_name] = get_agents_res(
             os.path.join(sim_path, "agents.json")
         )
+
+    print(f"Outputting Raw Data...")
+    data_to_json(sim_res["bus"], sim_res["line"])
+    print(f"Done!")
 
     print(f"Compare Sim Results for Buses: ...")
     comp_results_bus(sim_res["bus"])
