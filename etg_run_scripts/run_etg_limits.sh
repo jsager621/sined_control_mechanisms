@@ -1,7 +1,9 @@
 #!/bin/bash
 this_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-for ctrl_type in none tariff limits peak_price conditional_power
+
+# other mechanism runs
+for ctrl_type in limits # peak_price conditional_power
 do
     date +"%F %T"
     echo starting $ctrl_type

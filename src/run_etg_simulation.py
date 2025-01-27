@@ -88,8 +88,8 @@ async def create_agents_and_containers(grid_config, prosumer_config):
     return (sync_agent, participants, central_instance, [c])
 
 
-def process_outputs(participants, central_instance):
-    OUTDIR = os.path.join(os.path.dirname(__file__), "..", "outputs")
+def process_outputs(participants, central_instance, sub_dir_name=None):
+    OUTDIR = os.path.join(os.path.dirname(__file__), "..", "outputs", sub_dir_name)
     if not os.path.exists(OUTDIR):
         os.mkdir(OUTDIR)
 
@@ -127,12 +127,13 @@ def process_outputs(participants, central_instance):
 
 async def main():
     # set grid config from command line as necessary
-    if len(sys.argv) > 3:
+    if len(sys.argv) > 4:
         ctrl_type = sys.argv[1]
         r_pv = float(sys.argv[2])
         r_bss = float(sys.argv[3])
+        cond_kw_threshold = int(sys.argv[3])
     else:
-        logging.error("This script requires control type, R_PV and R_BSS as inputs.")
+        logging.error("This script requires control type, R_PV, R_BSS and cond_kw_threshold as inputs.")
         return
 
     # different config from old sim
@@ -143,6 +144,7 @@ async def main():
     grid_config["CONTROL_TYPE"] = ctrl_type
     grid_config["R_PV"] = r_pv
     grid_config["R_BSS"] = r_bss
+    grid_config["COND_POWER_THRESHOLD_kW"] = cond_kw_threshold
     
 
     sim_config = read_simulation_config()
@@ -169,8 +171,13 @@ async def main():
     for c in containers:
         await c.shutdown()
 
+    if ctrl_type is not "conditional_power":
+        sub_dir_name = ctrl_type
+    else:
+        sub_dir_name = f"{ctrl_type}_{cond_kw_threshold}"
+
     # presumably do some data collecting and saving here
-    process_outputs(participants, central_instance)
+    process_outputs(participants, central_instance, sub_dir_name)
 
 
 if __name__ == "__main__":
