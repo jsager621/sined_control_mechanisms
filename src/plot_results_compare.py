@@ -344,6 +344,7 @@ def main():
     for idx_sim in range(1, len(sys.argv)):
         sim_name = sys.argv[idx_sim]
         sim_path = os.path.join("outputs", sim_name)
+        sim_path = sim_name
 
         if not os.path.isdir(sim_path):
             print(f"No results for simulation in {sim_path}")

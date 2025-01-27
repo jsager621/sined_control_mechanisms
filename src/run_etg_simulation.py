@@ -29,12 +29,12 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-async def create_agents_and_containers(grid_config, prosumer_config):
+async def create_agents_and_containers(grid_config, prosumer_config, port_offset):
     # returns list of agents created via config
     # everything single container for now because no reason not to
     n_participants = grid_config["NUM_PARTICIPANTS"]
 
-    c = await create_container(addr=(HOST, PORT), codec=get_codec())
+    c = await create_container(addr=(HOST, PORT + port_offset), codec=get_codec())
 
     # participant ID decides which devices it has from the config ratios
     # read ratios
@@ -152,11 +152,12 @@ def process_outputs(participants, central_instance, sub_dir_name=None):
 
 async def main():
     # set grid config from command line as necessary
-    if len(sys.argv) > 4:
+    if len(sys.argv) > 5:
         ctrl_type = sys.argv[1]
         r_pv = float(sys.argv[2])
         r_bss = float(sys.argv[3])
-        cond_kw_threshold = int(sys.argv[3])
+        cond_kw_threshold = int(sys.argv[4])
+        port_offset = int(sys.argv[5])
     else:
         logging.error("This script requires control type, R_PV, R_BSS and cond_kw_threshold as inputs.")
         return
@@ -169,8 +170,10 @@ async def main():
     grid_config["CONTROL_TYPE"] = ctrl_type
     grid_config["R_PV"] = r_pv
     grid_config["R_BSS"] = r_bss
-    grid_config["COND_POWER_THRESHOLD_kW"] = cond_kw_threshold
-    
+    grid_config["CONFIG_CONTROL"]["COND_POWER_THRESHOLD_kW"] = cond_kw_threshold
+
+    if len(sys.argv) > 6:
+        grid_config["CONFIG_CONTROL"]["COND_POWER_ADD_COSTS"] = float(sys.argv[6])
 
     sim_config = read_simulation_config()
     random.seed(sim_config["seed"])
@@ -183,7 +186,7 @@ async def main():
     
 
     sync_agent, participants, central_instance, containers = (
-        await create_agents_and_containers(grid_config, prosumer_config)
+        await create_agents_and_containers(grid_config, prosumer_config, port_offset)
     )
 
     for p in participants:
@@ -196,7 +199,7 @@ async def main():
     for c in containers:
         await c.shutdown()
 
-    if ctrl_type is not "conditional_power":
+    if ctrl_type != "conditional_power":
         sub_dir_name = ctrl_type
     else:
         sub_dir_name = f"{ctrl_type}_{cond_kw_threshold}"
