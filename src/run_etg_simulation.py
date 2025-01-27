@@ -13,6 +13,7 @@ from datetime import datetime
 from util import read_simulation_config, read_grid_config, time_str_to_int, read_prosumer_config, ETG_BASE_GRID_CONF, ETG_CONF_DIR, ETG_PROSUMER_CONF
 import random
 import pandas as pd
+import math
 
 HOST = "localhost"
 PORT = 5557
@@ -46,14 +47,38 @@ async def create_agents_and_containers(grid_config, prosumer_config):
     # then shuffle each list
     # devices of agent i are given by the values in list i for each list
     pv = [i < r_pv * n_participants for i in range(n_participants)]
+    n_pv = sum(pv)
     ev = [i < r_ev * n_participants for i in range(n_participants)]
-    bss = [i < r_bss * n_participants for i in range(n_participants)]
     hp = [i < r_hp * n_participants for i in range(n_participants)]
 
+    # randomly distribute these units
     random.shuffle(pv)
     random.shuffle(ev)
-    random.shuffle(bss)
     random.shuffle(hp)
+
+    # assign bss to the households with PV units
+    n_bss = math.ceil(r_bss * n_pv)
+    bss_order = [i < n_bss for i in range(n_pv)]
+    random.shuffle(bss_order)
+    
+    bss = [False for i in range(n_participants)]
+
+    pv_idx = 0
+    for i in range(n_participants):
+        if not pv[i]:
+            continue
+
+        # this is the pv_idx's pv unit
+        if bss_order[pv_idx]:
+            bss[i] = True
+
+        pv_idx += 1
+
+        if pv_idx > n_pv - 1:
+            break
+
+    # sanity check for debugging, no BSS without PV
+    assert not any([bss[i] and not pv[i] for i in range(len(pv))])
 
     participants = []
     for i in range(n_participants):

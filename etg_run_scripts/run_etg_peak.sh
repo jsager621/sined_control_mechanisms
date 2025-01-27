@@ -1,6 +1,6 @@
 #!/bin/bash
 this_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
+this_dir=$this_dir/..
 
 # other mechanism runs
 for ctrl_type in peak_price # conditional_power

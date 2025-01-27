@@ -1,5 +1,6 @@
 #!/bin/bash
 this_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+this_dir=$this_dir/..
 cond=4
 
 # other mechanism runs
