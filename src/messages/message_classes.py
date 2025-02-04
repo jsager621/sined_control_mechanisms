@@ -65,6 +65,7 @@ class RegistrationReply:
 class ControlMechanismMessage:
     timestamp: int = field(default=None)
     tariff_adj: np.ndarray[float] = field(default=None)
+    tariff_adj_feedin: bool = field(default=False)
     p_max: np.ndarray[float] = field(default=None)
     p_min: np.ndarray[float] = field(default=None)
     peak_price_dem: float = field(default=None)

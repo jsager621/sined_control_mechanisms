@@ -122,7 +122,7 @@ class CentralInstance(Agent):
             ]
             self.current_participants += 1
         else:
-            logging.warn(
+            logging.warning(
                 "Trying to register too many participants. Excess participants will be ignored by the central instance."
             )
 
@@ -279,6 +279,9 @@ class CentralInstance(Agent):
                 self.control_signal.tariff_adj[step] = self.control_conf["TARIFF_ADJ"]
             for step in steps_curtail_generation:
                 self.control_signal.tariff_adj[step] = -self.control_conf["TARIFF_ADJ"]
+            self.control_signal.tariff_adj_feedin = self.control_conf[
+                "TARIFF_ADJ_FEEDIN"
+            ]
         elif self.control_type == "limits":
             # adjust power limits (with check wether there already was a limit or not)
             for step in steps_curtail_demand:
@@ -372,13 +375,23 @@ class CentralInstance(Agent):
             # possibly adjust maximum number of loops according to control type
             if self.control_type == "conditional_power":
                 self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
-                logging.warn(f"Max. # of loops for control type conditional_power = 1!")
+                logging.warning(
+                    f"Max. # of loops for control type conditional_power = 1!"
+                )
+                if self.control_conf["COND_POWER_SEND_ALWAYS"]:
+                    self.time_step_done = (
+                        False  # signal to be sent no matter of congestion
+                    )
             elif self.control_type == "peak_price":
                 self.control_conf["MAX_NUM_LOOPS"] = 1  # max. one control signal sent
-                logging.warn(f"Max. # of loops for control type peak_price = 1!")
+                logging.warning(f"Max. # of loops for control type peak_price = 1!")
+                if self.control_conf["PEAK_PRICE_SEND_ALWAYS"]:
+                    self.time_step_done = (
+                        False  # signal to be sent no matter of congestion
+                    )
             elif self.control_type == "none":
                 self.control_conf["MAX_NUM_LOOPS"] = 0  # no control signal sent
-                logging.warn(f"Max. # of loops for control type none = 0!")
+                logging.warning(f"Max. # of loops for control type none = 0!")
 
             # gets instantly skipped if schedules are already ok
             # flag gets set by calculate_grid_schedule when the schedule
@@ -386,7 +399,7 @@ class CentralInstance(Agent):
             while not self.time_step_done:
                 # check if looping of sending control signals exceeded max.
                 if step_loops > self.control_conf["MAX_NUM_LOOPS"]:
-                    logging.warn(
+                    logging.warning(
                         f"Could not resolve all issues in time step: {timestamp}"
                     )
                     self.time_step_done = True

@@ -33,6 +33,7 @@
         
         - MAX_NUM_LOOPS >1, should be around 5, as congested time steps are continuously added to list of adjusted tariff steps
         - TARIFF_ADJ >0, small value of a couple cents sufficient (typically approx. 0.08 eur/kWh from grid charges, should be below)
+        - TARIFF_ADJ_FEEDIN true/false, whether to apply adjustment for tariff values at schedule timesteps also to feedin tariff or just to the electricity consumption price (false for fixed feedin tariff)
     
     - "limits"
         
@@ -47,12 +48,14 @@
         - MAX_NUM_LOOPS = 1, one iteration maximum, as values only applied
         - PEAK_PRICE_DEM >0, daily price of peak demand, small value of a couple cents sufficient
         - PEAK_PRICE_GEN >0, daily price of peak generation, small value of a couple cents sufficient
+        - PEAK_PRICE_SEND_ALWAYS true/false, whether a signal should be sent no matter if there is a congestion or not
     
     - "conditional_power"
         
         - MAX_NUM_LOOPS = 1, one iteration maximum, as values only applied
         - COND_POWER_THRESHOLD_kW >0, value above which extra costs apply
         - COND_POWER_ADD_COSTS >0, extra costs for power above threshold
+        - COND_POWER_SEND_ALWAYS true/false, whether a signal should be sent no matter if there is a congestion or not
 
 - GRID = "kerber_dorfnetz", other [pandapower grids](https://pandapower.readthedocs.io/en/latest/networks.html) possible
 - NUM_HOUSEHOLDS = 57 for "kerber_dorfnetz"
