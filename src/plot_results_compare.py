@@ -15,6 +15,9 @@ GRAN = 96
 DAY_START = 40.75
 DAY_END = 40.99
 IDX_DAYS_PLOT = [int(GRAN * DAY_START), int(GRAN * DAY_END)]
+FORMATs = ["pdf", "png"]
+DPI = 500
+FONT_SIZE = 18
 
 
 def timesteps_to_datetime(timesteps_np: np.ndarray) -> np.datetime64:
@@ -41,12 +44,14 @@ def comp_results_line(res_dict):
     plt.ylim((0, max(1.1 * max(list_max_val), 100)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "line_val_range.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "line_val_range." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     # number of violations plus overload work
     list_violations = []
@@ -63,12 +68,14 @@ def comp_results_line(res_dict):
     plt.ylim((0, max(1.1 * max(list_violations), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "line_num_viol.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "line_num_viol." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ovl_work, width=0.8)
@@ -78,29 +85,34 @@ def comp_results_line(res_dict):
     plt.ylim((0, max(1.1 * max(list_ovl_work), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "line_ovl_work.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
-
-    # profile for exemplary day
-    if len(res_dict) < 10:
-        fig = plt.figure(figsize=(10, 4))
-        for name, res_sim in res_dict.items():
-            plt.plot(res_sim["df"]["trafo 1"], label=name)
-        plt.xlabel("Simulation time step")
-        plt.ylabel("Transformer loading, in %")
-        plt.xlim(IDX_DAYS_PLOT[0], IDX_DAYS_PLOT[1])
-        plt.ylim(0, 125)
-        plt.axhline(y=100, color="r", linestyle="--", linewidth=1)
-        plt.legend(loc="upper left")
-        fig.get_axes()[0].set_rasterized(True)
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
         plt.savefig(
-            os.path.join("outputs", "comp", "line_load_profile.png"),
-            dpi=300,
-            format="png",
+            os.path.join("outputs", "comp", "line_ovl_work." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
+
+
+def comp_results_line_profile(res_dict):
+    # profile for exemplary day
+    fig = plt.figure(figsize=(10, 4))
+    for name, res_sim in res_dict.items():
+        plt.plot(res_sim["df"]["trafo 1"], label=name)
+    plt.xlabel("Simulation time step")
+    plt.ylabel("Transformer loading, in %")
+    plt.xlim(IDX_DAYS_PLOT[0], IDX_DAYS_PLOT[1])
+    plt.ylim(0, 125)
+    plt.axhline(y=100, color="r", linestyle="--", linewidth=1)
+    plt.legend(loc="upper left")
+    fig.get_axes()[0].set_rasterized(True)
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "line_load_profile." + f),
+            dpi=DPI,
+            format=f,
             bbox_inches="tight",
         )
 
@@ -127,12 +139,14 @@ def comp_results_bus(res_dict):
     plt.ylim((min(0.9 * min(list_min_val), 0.99), max(1.1 * max(list_max_val), 1.01)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "bus_val_range.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "bus_val_range." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     # number of violations plus overload work
     list_vio_up = []
@@ -156,12 +170,14 @@ def comp_results_bus(res_dict):
     plt.ylim((min(1.1 * min(list_vio_low), -1), max(1.1 * max(list_vio_up), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "bus_num_viol.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "bus_num_viol." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ovl_sum_up, width=0.8)
@@ -174,31 +190,63 @@ def comp_results_bus(res_dict):
     plt.ylim((min(-1.1 * max(list_ovl_sum_lw), -1), max(1.1 * max(list_ovl_sum_up), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "bus_vm_ovl_sum.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
-
-    # profile for exemplary day
-    if len(res_dict) < 10:
-        fig = plt.figure(figsize=(10, 4))
-        plt.axhline(y=1.05, color="r", linestyle="--", linewidth=1)
-        plt.axhline(y=0.95, color="r", linestyle="--", linewidth=1)
-        plt.axhline(y=1, color="grey", linestyle="--", linewidth=1)
-        for name, res_sim in res_dict.items():
-            plt.plot(res_sim["df"]["KV_3_16"], label=name)
-        plt.xlabel("Simulation time step")
-        plt.ylabel("Bus voltage magnitude, in p.u.")
-        plt.xlim(IDX_DAYS_PLOT[0], IDX_DAYS_PLOT[1])
-        plt.ylim(0.945, 1.005)
-        plt.legend(loc="upper left")
-        fig.get_axes()[0].set_rasterized(True)
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
         plt.savefig(
-            os.path.join("outputs", "comp", "bus_vm_profile.png"),
-            dpi=300,
-            format="png",
+            os.path.join("outputs", "comp", "bus_vm_ovl_sum." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
+
+
+def comp_results_bus_profile(res_dict):
+    # profile for exemplary day
+    fig = plt.figure(figsize=(10, 4.8))
+    plt.axhline(y=1.05, color="r", linestyle="--", linewidth=1)
+    plt.axhline(y=0.95, color="r", linestyle="--", linewidth=1)
+    plt.axhline(y=1, color="grey", linestyle="--", linewidth=1)
+    cols = [
+        "#005374",
+        "#66B4D3",
+        "#BE1E3C",
+        "#711C2F",
+        "#D46700",
+        "#6D8300",
+        "#4C1830",
+        "#B983B2",
+        "#00534A",
+    ]
+    lstls = [
+        "-",
+        ":",
+        "--",
+        "-.",
+        (5, (10, 3)),
+        (0, (3, 5, 1, 5)),
+        (0, (1, 5)),
+        (0, (5, 5)),
+        (0, (1, 1)),
+    ]
+    for idx, name in enumerate(res_dict.keys()):
+        plt.plot(
+            res_dict[name]["df"]["KV_3_16"],
+            label=name,
+            color=cols[idx],
+            linestyle=lstls[idx],
+        )
+    plt.xlabel("Simulation time step")
+    plt.ylabel("Bus voltage magnitude, in p.u.")
+    plt.xlim(IDX_DAYS_PLOT[0], IDX_DAYS_PLOT[1])
+    plt.ylim(0.945, 1.005)
+    plt.legend(loc="upper left")
+    fig.get_axes()[0].set_rasterized(True)
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "bus_vm_profile." + f),
+            dpi=DPI,
+            format=f,
             bbox_inches="tight",
         )
 
@@ -223,9 +271,13 @@ def comp_results_agents(res_dict):
     plt.ylim((0.98 * min(list_energy), max(1.05 * max(list_energy), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "agent_energy_avg.png"), dpi=300, format="png"
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "agent_energy_avg." + f),
+            dpi=DPI,
+            format=f,
+        )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_cost, width=0.8)
@@ -235,9 +287,13 @@ def comp_results_agents(res_dict):
     plt.ylim((0.98 * min(list_cost), max(1.05 * max(list_cost), 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "agent_cost_avg.png"), dpi=300, format="png"
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "agent_cost_avg." + f),
+            dpi=DPI,
+            format=f,
+        )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_sc, width=0.8)
@@ -247,9 +303,13 @@ def comp_results_agents(res_dict):
     plt.ylim((min(list_sc) - 0.1, max(max(list_sc) + 0.3, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "agent_sc_avg.png"), dpi=300, format="png"
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "agent_sc_avg." + f),
+            dpi=DPI,
+            format=f,
+        )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(10, 4))
     plt.bar(res_dict.keys(), list_ss, width=0.8)
@@ -259,9 +319,13 @@ def comp_results_agents(res_dict):
     plt.ylim((min(list_ss) - 0.1, max(max(list_ss) + 0.3, 1)))
     plt.xticks(rotation=45, ha="right")
     ax.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "agent_ss_avg.png"), dpi=300, format="png"
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "agent_ss_avg." + f),
+            dpi=DPI,
+            format=f,
+        )
 
 
 def comp_results_table(sim_res):
@@ -317,7 +381,7 @@ def comp_results_table(sim_res):
 
 def comp_results_plots_violations(sim_res):
     # plot for comparison of number of violations
-    fig, ax1 = plt.subplots(figsize=(10, 4))
+    fig, ax1 = plt.subplots(figsize=(10, 3.5))
     ax1.grid()
     x_coord = np.arange(len(sim_res["bus"].keys()))
     # voltage values
@@ -325,11 +389,11 @@ def comp_results_plots_violations(sim_res):
     col_up = (102 / 255, 180 / 255, 211 / 255)
     col_lw = (0 / 255, 83 / 255, 116 / 255)
     ax1.scatter(
-        x_coord, num_v, label="Voltage - upper limit", color=col_up, marker="^", s=120
+        x_coord, num_v, label="Voltage, upper lim.", color=col_up, marker="^", s=120
     )
     num_v = [-min(res_dict["num_ovl_lw_list"]) for res_dict in sim_res["bus"].values()]
     ax1.scatter(
-        x_coord, num_v, label="Voltage - lower limit", color=col_lw, marker="v", s=120
+        x_coord, num_v, label="Voltage, lower lim.", color=col_lw, marker="v", s=120
     )
     # loading values
     num_v = [res_dict["num_ovl_sum"] for res_dict in sim_res["line"].values()]
@@ -344,35 +408,38 @@ def comp_results_plots_violations(sim_res):
     ax1.set_xticklabels(sim_res["bus"].keys(), rotation=45, ha="right")
     ax1.legend(loc="upper right")
     # ax1.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_num.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_num." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     # plot for comparison of aggregated violation
-    fig, ax1 = plt.subplots(figsize=(10, 4.5))
+    fig, ax1 = plt.subplots(figsize=(10, 6))
     ax1.grid()
     x_coord = np.arange(len(sim_res["bus"].keys()))
     # first axis with voltage values
     col = (102 / 255, 180 / 255, 211 / 255)
+    col_ax = (0 / 255, 83 / 255, 116 / 255)
     num_v = [res_dict["ovl_sum_ov"] for res_dict in sim_res["bus"].values()]
     ax1.scatter(
-        x_coord, num_v, label="Voltage - upper limit", color=col, marker="^", s=120
+        x_coord, num_v, label="Voltage, upper lim.", color=col, marker="^", s=120
     )
     num_v = [res_dict["ovl_sum_lw"] for res_dict in sim_res["bus"].values()]
     ax1.scatter(
         x_coord,
         num_v,
-        label="Voltage - lower limit",
-        color=(0 / 255, 83 / 255, 116 / 255),
+        label="Voltage, lower lim.",
+        color=col_ax,
         marker="v",
         s=120,
     )
     ax1.set_xlabel("")
-    ax1.set_ylabel("Aggregated voltage range violations, in p.u.", color=col)
-    ax1.tick_params(axis="y", labelcolor=col)
+    ax1.set_ylabel("Aggregated voltage violations, in p.u.", color=col_ax)
+    ax1.tick_params(axis="y", labelcolor=col_ax)
     ax1.set_xticks(x_coord)
     ax1.set_xticklabels(sim_res["bus"].keys(), rotation=45, ha="right")
     # seconds axis with trafo loading
@@ -380,17 +447,19 @@ def comp_results_plots_violations(sim_res):
     ax2 = ax1.twinx()
     num_v = [res_dict["ovl_work_kWh"] / 1000 for res_dict in sim_res["line"].values()]
     ax2.scatter(x_coord, num_v, label="Loading", color=col, s=100)
-    ax2.set_ylabel("Aggregated line & transformer overloading, in MWh", color=col)
+    ax2.set_ylabel("Aggregated line overload, in MWh", color=col)
     ax2.tick_params(axis="y", labelcolor=col)
     # adds
     ax1.legend(loc="upper right")
     # fig.get_axes()[0].set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_viol.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_viol." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
 
 def comp_results_plots_extrema(sim_res):
@@ -419,12 +488,14 @@ def comp_results_plots_extrema(sim_res):
     ax2.set_ylabel("Maximum transformer loading, in %", color=col)
     ax2.tick_params(axis="y", labelcolor=col)
     # adds
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_extr.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_extr." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
 
 def comp_results_plots_agents(sim_res):
@@ -461,12 +532,14 @@ def comp_results_plots_agents(sim_res):
     ax2.set_ylabel("Change in average self-consumption, in %", color=col)
     ax2.tick_params(axis="y", labelcolor=col)
     fig.get_axes()[0].set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_agents.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_agents_sc." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
     # plot for comparison of costs and energy sums (compared to reference case)
     fig, ax1 = plt.subplots(figsize=(8, 3))
@@ -512,24 +585,25 @@ def comp_results_plots_agents(sim_res):
     ax2.set_ylabel("Change in aggregated energy, in %", color=col)
     ax2.tick_params(axis="y", labelcolor=col)
     fig.get_axes()[0].set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_agents.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_agents_energy." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
 
 def comp_results_plots_agents_cost(sim_res):
     # plot for comparison of costs and self-consumption (compared to reference case)
-    fig, ax1 = plt.subplots(figsize=(8, 3))
+    fig, ax1 = plt.subplots(figsize=(12, 5))
     ax1.grid()
     x_names_w_ref = list(sim_res["bus"].keys())
     x_ref = x_names_w_ref[0]
     x_names = x_names_w_ref[1:]
     x_coord = np.arange(len(x_names))
     # first axis with costs
-    col = (102 / 255, 180 / 255, 211 / 255)
     num_v = [
         (
             (
@@ -545,23 +619,23 @@ def comp_results_plots_agents_cost(sim_res):
             x=idx,
             y=num_v[idx] + 17,
             s=str(round(num_v[idx])),
-            color=col,
             horizontalalignment="center",
             verticalalignment="center",
         )
-    ax1.scatter(x_coord, num_v, color=col, s=120)
+    ax1.scatter(x_coord, num_v, color="k", s=120)
     ax1.set_xlabel("")
-    ax1.set_ylabel("Change in average cost, in ct", color=col)
-    ax1.tick_params(axis="y", labelcolor=col)
+    ax1.set_ylabel("Change in average cost, in ct")
     ax1.set_xticks(x_coord)
     ax1.set_xticklabels(x_names, rotation=45, ha="right")
     ax1.set_ylim(top=max(num_v) * 1.15)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_costs.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_costs." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
 
 def comp_results_plots_agents_energy(sim_res):
@@ -625,12 +699,14 @@ def comp_results_plots_agents_energy(sim_res):
     ax1.set_xticklabels(sim_res["agents"].keys(), rotation=45, ha="right")
     ax1.legend(loc="upper right")
     # ax1.set_rasterized(True)
-    plt.savefig(
-        os.path.join("outputs", "comp", "comp_plot_energy.png"),
-        dpi=300,
-        format="png",
-        bbox_inches="tight",
-    )
+    plt.rcParams.update({"font.size": FONT_SIZE, "legend.fontsize": FONT_SIZE - 4})
+    for f in FORMATs:
+        plt.savefig(
+            os.path.join("outputs", "comp", "comp_plot_energy." + f),
+            dpi=DPI,
+            format=f,
+            bbox_inches="tight",
+        )
 
 
 def main():
@@ -674,16 +750,20 @@ def main():
         )
 
     print(f"Compare Sim Results for Buses: ...")
-    comp_results_bus(sim_res["bus"])
+    # comp_results_bus(sim_res["bus"])
+    if len(sim_res["bus"]) < 10:
+        comp_results_bus_profile(sim_res["bus"])
     print(f"Done!")
 
     print(f"Compare Sim Results for Lines: ...")
-    comp_results_line(sim_res["line"])
+    # comp_results_line(sim_res["line"])
+    if len(sim_res["line"]) < 10:
+        comp_results_bus_profile(sim_res["line"])
     print(f"Done!")
 
-    print(f"Compare Sim Results for Agents: ...")
-    comp_results_agents(sim_res["agents"])
-    print(f"Done!")
+    # print(f"Compare Sim Results for Agents: ...")
+    # comp_results_agents(sim_res["agents"])
+    # print(f"Done!")
 
     print(f"Create Overview Table for Sim Results: ...")
     comp_results_table(sim_res)
