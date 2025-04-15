@@ -13,7 +13,7 @@ Then, you have to set up the code, which can be done by cloning the repository t
 Afterwards, set up your IDE (e.g. Visual Studio Code) by (creating a virtual environment ```python -m venv .venv``` and) installing the requirements ```pip install -r requirements.txt```.
 
 Finally, run the setup by using the following instructions and possibly adapting the configurations (```/config/```) of the simulation.
-For that, see [the config readme](https://github.com/jsagerOffis/sined_control_mechanisms/tree/main/config).
+For that, see [the config readme](https://github.com/jsager621/sined_control_mechanisms/tree/main/config).
 
 ### To start a simulation:
 
